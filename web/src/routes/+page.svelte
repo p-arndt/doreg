@@ -13,8 +13,7 @@
 	import ErrorState from '#lib/components/ErrorState.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
 	import Time from '#lib/components/Time.svelte';
-	import Facts from '#lib/components/Facts.svelte';
-	import Fact from '#lib/components/Fact.svelte';
+	import Readout from '#lib/components/Readout.svelte';
 	import RepoTable from '#lib/features/RepoTable.svelte';
 	import type { RepoListItem, Stats } from '#lib/types.js';
 
@@ -73,13 +72,25 @@
 </PageHeader>
 
 {#if stats}
-	<div class="storage">
-		<Facts label="Registry">
-			<Fact label="Repositories" measure>{stats.repositories}</Fact>
-			<Fact label="Tags" measure>{stats.tags}</Fact>
-			<Fact label="Image data" measure>{bytes(stats.blobBytes)}</Fact>
+	<section class="storage" aria-label="Storage">
+		<div class="storage__main">
+			<div class="storage__head">
+				<div class="storage__lead">
+					<p class="storage__label">Image data</p>
+					<p class="storage__value"><Readout value={bytes(stats.blobBytes)} /></p>
+				</div>
+				{#if stats.disk}
+					<div class="storage__lead">
+						<p class="storage__label">Disk free</p>
+						<p class="storage__value">
+							<Readout value={bytes(stats.disk.free)} />
+							<span class="storage__of">of {bytes(stats.disk.total)}</span>
+						</p>
+					</div>
+				{/if}
+			</div>
 			{#if stats.disk}
-				<Fact label="Disk" measure>
+				<div class="storage__disk">
 					<span
 						class="storage__bar"
 						role="meter"
@@ -97,23 +108,44 @@
 							style:width="{fraction(diskUsed - stats.blobBytes, stats.disk.total) * 100}%"
 						></span>
 					</span>
-					{bytes(stats.disk.free)} free of {bytes(stats.disk.total)}
-				</Fact>
+					<span class="legend">
+						<span><span class="key key--images"></span>Images {bytes(stats.blobBytes)}</span>
+						<span
+							><span class="key key--other"></span>Other files {bytes(
+								Math.max(0, diskUsed - stats.blobBytes)
+							)}</span
+						>
+						<span><span class="key key--free"></span>Free {bytes(stats.disk.free)}</span>
+					</span>
+				</div>
 			{/if}
-			<Fact label={stats.lastGc?.dryRun ? 'Last preview' : 'Last cleanup'}>
-				{#if stats.gcRunning}
-					<Badge tone="accent">Running</Badge>
-				{:else if stats.lastGc}
-					<span class="measure">{bytes(stats.lastGc.freedBytes)}</span>
-					<span class="muted"
-						><Time unix={stats.lastGc.finishedAt || stats.lastGc.startedAt} /></span
-					>
-				{:else}
-					<span class="muted">None yet</span>
-				{/if}
-			</Fact>
-		</Facts>
-	</div>
+		</div>
+		<dl class="storage__aside">
+			<div>
+				<dt>Repositories</dt>
+				<dd class="measure">{stats.repositories}</dd>
+			</div>
+			<div>
+				<dt>Tags</dt>
+				<dd class="measure">{stats.tags}</dd>
+			</div>
+			<div>
+				<dt>{stats.lastGc?.dryRun ? 'Last preview' : 'Last cleanup'}</dt>
+				<dd>
+					{#if stats.gcRunning}
+						<Badge tone="accent">Running</Badge>
+					{:else if stats.lastGc}
+						<span class="measure">{bytes(stats.lastGc.freedBytes)}</span>
+						<span class="muted"
+							><Time unix={stats.lastGc.finishedAt || stats.lastGc.startedAt} /></span
+						>
+					{:else}
+						<span class="muted">None yet</span>
+					{/if}
+				</dd>
+			</div>
+		</dl>
+	</section>
 {/if}
 
 <div class="toolbar">
@@ -130,21 +162,23 @@
 		<Select
 			aria-label="Project"
 			value={project}
-			onchange={(e) => setParam('project', e.currentTarget.value, '')}
-		>
-			<option value="">All projects</option>
-			{#each projects as p (p)}<option value={p}>{p}</option>{/each}
-		</Select>
+			onchange={(v) => setParam('project', v, '')}
+			options={[
+				{ value: '', label: 'All projects' },
+				...projects.map((p) => ({ value: p, label: p }))
+			]}
+		/>
 	{/if}
 	<Select
 		aria-label="Sort"
 		value={sort}
-		onchange={(e) => setParam('sort', e.currentTarget.value, 'name')}
-	>
-		<option value="name">Sort by name</option>
-		<option value="recent">Recently pushed</option>
-		<option value="size">Largest first</option>
-	</Select>
+		onchange={(v) => setParam('sort', v, 'name')}
+		options={[
+			{ value: 'name', label: 'Sort by name' },
+			{ value: 'recent', label: 'Recently pushed' },
+			{ value: 'size', label: 'Largest first' }
+		]}
+	/>
 </div>
 
 {#if error}
@@ -171,29 +205,152 @@
 
 <style>
 	.login-cmd {
-		width: min(20rem, 100%);
+		width: min(22rem, 100%);
 	}
 
+	/* One storage panel: the two sizes the screen is about, the disk as a full-width bar, the counts as a quiet aside. */
 	.storage {
-		margin: calc(-1 * var(--space-2)) 0 var(--space-6);
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: var(--space-5) var(--space-6);
+		margin: 0 0 var(--space-6);
+		padding: var(--space-5);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-xl);
+		background: var(--surface);
+		box-shadow: var(--shadow-control);
 	}
 
-	/* The disk as a ruled bar: image data in lime, everything else on the disk in grey. */
+	.storage__main {
+		display: grid;
+		align-content: space-between;
+		gap: var(--space-5);
+		min-width: 0;
+	}
+
+	.storage__head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		gap: var(--space-4) var(--space-7);
+	}
+
+	.storage__lead {
+		display: grid;
+		gap: var(--space-1);
+	}
+
+	.storage__label {
+		color: var(--fg-subtle);
+		font-size: var(--text-sm);
+		font-weight: 500;
+	}
+
+	.storage__value {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-2);
+		font-size: var(--text-xl);
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		line-height: 1.2;
+	}
+
+	.storage__of {
+		color: var(--fg-subtle);
+		font-size: var(--text-sm);
+		font-weight: 400;
+		letter-spacing: 0;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.storage__aside {
+		display: grid;
+		align-content: center;
+		gap: var(--space-1);
+		width: 15rem;
+		padding-left: var(--space-6);
+		border-left: 1px solid var(--border);
+		font-size: var(--text-sm);
+	}
+
+	.storage__aside > div {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-6);
+		min-height: 1.5rem;
+	}
+
+	.storage__aside dt {
+		color: var(--fg-subtle);
+	}
+
+	.storage__aside dd {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		margin: 0;
+		color: var(--fg);
+	}
+
+	.storage__disk {
+		display: grid;
+		gap: var(--space-3);
+	}
+
 	.storage__bar {
-		display: inline-flex;
-		width: 6rem;
-		height: 6px;
-		margin-right: var(--space-2);
+		display: flex;
+		gap: 2px;
+		height: 0.5rem;
+		overflow: hidden;
+		border-radius: var(--radius-pill);
 		background: var(--track);
 	}
 
 	.storage__images {
-		min-width: 2px;
+		min-width: 4px;
+		border-radius: var(--radius-pill);
 		background: var(--accent);
 	}
 
 	.storage__other {
+		border-radius: var(--radius-pill);
 		background: var(--track-strong);
+	}
+
+	.legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-1) var(--space-5);
+		color: var(--fg-muted);
+		font-size: var(--text-sm);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.legend > span {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+	}
+
+	.key {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: var(--radius-pill);
+	}
+
+	.key--images {
+		background: var(--accent);
+	}
+
+	.key--other {
+		background: var(--track-strong);
+	}
+
+	.key--free {
+		background: var(--track);
+		box-shadow: inset 0 0 0 1px var(--border-hover);
 	}
 
 	.toolbar {
@@ -204,7 +361,26 @@
 	}
 
 	.toolbar :global(.toolbar__search) {
-		flex: 1;
+		flex: 1 1 14rem;
 		max-width: 22rem;
+	}
+
+	@media (max-width: 40rem) {
+		.storage {
+			padding: var(--space-4);
+		}
+	}
+
+	@media (max-width: 48rem) {
+		.storage {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.storage__aside {
+			width: 100%;
+			padding: var(--space-3) 0 0;
+			border-left: 0;
+			border-top: 1px solid var(--border);
+		}
 	}
 </style>

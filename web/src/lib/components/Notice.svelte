@@ -20,7 +20,7 @@
 		align-items: flex-start;
 		gap: var(--space-2);
 		padding: var(--space-2) var(--space-3);
-		border-radius: var(--radius);
+		border-radius: var(--radius-lg);
 		font-size: var(--text-sm);
 		overflow-wrap: anywhere;
 	}

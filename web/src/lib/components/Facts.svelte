@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 
-	// Rim's measurement strip: labelled values in a row, parted by vertical hairlines.
-	// Use <Fact> children; a Fact marked `measure` sets its value in mono.
+	// A quiet metadata panel: labelled values on one grid, labels above values, every value the same size.
+	// Use <Fact> children.
 	let { children, label }: { children: Snippet; label?: string } = $props();
 </script>
 
@@ -14,22 +14,21 @@
 	.facts {
 		display: flex;
 		flex-wrap: wrap;
+		gap: var(--space-4) var(--space-7);
 		margin: 0;
-		border-top: 1px solid var(--border-strong);
-		border-bottom: 1px solid var(--border-strong);
+		padding: var(--space-4) var(--space-5);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		background: var(--surface);
+		box-shadow: var(--shadow-control);
 	}
 
-	.facts :global(.fact) {
-		display: grid;
-		gap: 0.125rem;
-		min-width: 0;
-		padding: var(--space-3) var(--space-5) var(--space-3) 0;
-		margin-right: var(--space-5);
-		border-right: 1px solid var(--border);
-	}
-
-	.facts :global(.fact:last-child) {
-		border-right: 0;
-		margin-right: 0;
+	@media (max-width: 40rem) {
+		.facts {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: var(--space-4);
+			padding: var(--space-4);
+		}
 	}
 </style>

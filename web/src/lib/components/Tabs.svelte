@@ -23,7 +23,7 @@
 <style>
 	.tabs {
 		display: flex;
-		gap: var(--space-5);
+		gap: var(--space-1);
 		margin-bottom: var(--space-5);
 		border-bottom: 1px solid var(--border);
 		overflow-x: auto;
@@ -31,15 +31,44 @@
 	}
 
 	a {
+		position: relative;
+		isolation: isolate;
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-2);
-		padding: var(--space-2) 0 0.625rem;
-		margin-bottom: -1px;
-		border-bottom: 2px solid transparent;
+		height: 2.5rem;
+		padding: 0 var(--space-3);
 		color: var(--fg-muted);
 		font-weight: 500;
 		white-space: nowrap;
+		transition: color var(--dur-micro) var(--ease);
+	}
+
+	a::before {
+		content: '';
+		position: absolute;
+		inset: var(--space-1) 0;
+		z-index: -1;
+		border-radius: var(--radius);
+		background: var(--surface-hover);
+		opacity: 0;
+		transition: opacity var(--dur-micro) var(--ease);
+	}
+
+	a::after {
+		content: '';
+		position: absolute;
+		left: var(--space-3);
+		right: var(--space-3);
+		bottom: -1px;
+		height: 2px;
+		border-radius: 2px 2px 0 0;
+		background: var(--accent);
+		opacity: 0;
+		transform: scaleX(0.6);
+		transition:
+			opacity var(--dur-micro) var(--ease),
+			transform var(--dur-short) var(--ease);
 	}
 
 	a:hover {
@@ -47,20 +76,28 @@
 		text-decoration: none;
 	}
 
-	a[aria-current='page'] {
-		color: var(--fg);
-		border-bottom-color: var(--accent);
+	a:hover::before {
+		opacity: 1;
 	}
 
-	a[aria-current='page'] .tabs__count {
-		background: var(--accent-soft);
-		color: var(--accent-fg);
+	a:focus-visible {
+		outline-offset: -2px;
+		border-radius: var(--radius);
+	}
+
+	a[aria-current='page'] {
+		color: var(--fg);
+	}
+
+	a[aria-current='page']::after {
+		opacity: 1;
+		transform: none;
 	}
 
 	.tabs__count {
 		min-width: 1.25rem;
 		padding: 0 0.375rem;
-		border-radius: var(--radius-sm);
+		border-radius: var(--radius-xs);
 		background: var(--surface-active);
 		color: var(--fg-muted);
 		font-size: var(--text-xs);

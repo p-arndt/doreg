@@ -1,0 +1,15 @@
+[
+	{
+		"mode": "redesign",
+		"depth": "full",
+		"scope": "app",
+		"shape": "app screen",
+		"theme": "rim",
+		"axes": "dark/grotesk-sans/warm",
+		"nav": "kept sidebar, grouped, lime square for the current place",
+		"signature": "layer strip: the image drawn as its layers",
+		"prompt": "self-hosted container registry console for developers; lime accent on warm greys",
+		"waived": [],
+		"date": "2026-11-16"
+	}
+]

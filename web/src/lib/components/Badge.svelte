@@ -21,7 +21,7 @@
 		gap: 0.25rem;
 		height: 1.25rem;
 		padding: 0 0.4375rem;
-		border-radius: var(--radius-sm);
+		border-radius: var(--radius-xs);
 		font-size: var(--text-xs);
 		font-weight: 500;
 		line-height: 1;

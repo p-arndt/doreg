@@ -20,6 +20,7 @@
 	import Time from '#lib/components/Time.svelte';
 	import Facts from '#lib/components/Facts.svelte';
 	import Fact from '#lib/components/Fact.svelte';
+	import Readout from '#lib/components/Readout.svelte';
 	import type { GcRun, GcSettings } from '#lib/types.js';
 
 	interface Status {
@@ -169,7 +170,7 @@
 	{:else if runId && !detail}
 		<div class="block"><Skeleton rows={3} columns={[3, 1, 1]} /></div>
 	{:else if detail && report}
-		<section class="report block ticks" aria-live="polite">
+		<section class="report block" aria-live="polite">
 			<header class="report__head">
 				<div class="report__title">
 					<h2>
@@ -188,8 +189,8 @@
 				</div>
 			</header>
 			<Facts label="Run results">
-				<Fact label={detail.dryRun ? 'Would free' : 'Freed'} measure
-					>{bytes(detail.freedBytes)}</Fact
+				<Fact label={detail.dryRun ? 'Would free' : 'Freed'} big
+					><Readout value={bytes(detail.freedBytes)} /></Fact
 				>
 				<Fact label="Tags by retention" measure>{report.deletedTags.length}</Fact>
 				<Fact label="Manifests" measure>{report.deletedManifests.length}</Fact>
@@ -371,7 +372,15 @@
 		display: grid;
 		gap: var(--space-4);
 		padding: var(--space-5);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-xl);
 		background: var(--surface);
+		box-shadow: var(--shadow-control);
+	}
+
+	.report :global(.facts) {
+		background: var(--bg-sidebar);
+		box-shadow: none;
 	}
 
 	.report__head {
@@ -452,7 +461,8 @@
 		gap: var(--space-4);
 		padding: var(--space-5);
 		border: 1px solid var(--border);
-		border-radius: var(--radius-lg);
+		border-radius: var(--radius-xl);
+		background: var(--surface);
 	}
 
 	.fields :global(.input) {

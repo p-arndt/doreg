@@ -10,9 +10,11 @@
 	}: { title: string; description?: string; icon?: IconName; children?: Snippet } = $props();
 </script>
 
-<div class="empty ticks">
-	{#if icon}<span class="empty__icon"><Icon name={icon} size={18} /></span>{/if}
-	<h2 class="empty__title">{title}</h2>
+<div class="empty">
+	<div class="empty__head">
+		{#if icon}<Icon name={icon} size={16} />{/if}
+		<h2 class="empty__title">{title}</h2>
+	</div>
 	{#if description}<p class="empty__desc">{description}</p>{/if}
 	{#if children}<div class="empty__actions">{@render children()}</div>{/if}
 </div>
@@ -23,19 +25,24 @@
 		justify-items: center;
 		gap: var(--space-2);
 		padding: var(--space-7) var(--space-5);
-		background: var(--surface);
+		border: 1px dashed var(--border-strong);
+		border-radius: var(--radius-lg);
 		text-align: center;
 	}
 
-	.empty__icon {
+	.empty__head {
 		display: grid;
-		place-items: center;
-		width: 2.25rem;
-		height: 2.25rem;
-		margin-bottom: var(--space-1);
+		justify-items: center;
+		gap: var(--space-3);
+	}
+
+	.empty__head :global(.icon) {
+		box-sizing: content-box;
+		padding: var(--space-2);
+		border: 1px solid var(--border-strong);
 		border-radius: var(--radius);
-		background: var(--accent-soft);
-		color: var(--accent-fg);
+		background: var(--surface-raised);
+		color: var(--fg-muted);
 	}
 
 	.empty__title {
@@ -43,7 +50,7 @@
 	}
 
 	.empty__desc {
-		max-width: 26rem;
+		max-width: 34rem;
 		color: var(--fg-muted);
 		font-size: var(--text-sm);
 	}

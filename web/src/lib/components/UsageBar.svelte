@@ -35,7 +35,7 @@
 	.usage__bar {
 		display: block;
 		height: 4px;
-		border-radius: 0;
+		border-radius: var(--radius-pill);
 		background: var(--track);
 		overflow: hidden;
 	}

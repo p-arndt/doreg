@@ -19,6 +19,7 @@
 	.skeleton {
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
+		background: var(--surface);
 		overflow: hidden;
 	}
 
@@ -42,7 +43,7 @@
 	.skeleton__bar {
 		display: block;
 		height: 0.625rem;
-		border-radius: 0;
+		border-radius: var(--radius-pill);
 		background: linear-gradient(
 			90deg,
 			var(--skeleton-a) 0%,

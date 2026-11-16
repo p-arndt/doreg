@@ -63,7 +63,7 @@
 				<span class="am__name">{me.user.username}</span>
 				<span class="am__role">{me.user.role}</span>
 			</span>
-			<Icon name="chevronsUpDown" size={14} />
+			<span class="am__chev"><Icon name="chevronsUpDown" size={14} /></span>
 		</button>
 	</div>
 {/if}
@@ -76,20 +76,25 @@
 	.am__trigger {
 		display: flex;
 		align-items: center;
-		gap: var(--space-2);
+		gap: 0.625rem;
 		width: 100%;
-		padding: var(--space-2);
+		height: 2.75rem;
+		padding: 0 var(--space-2);
 		border: 0;
 		border-radius: var(--radius);
 		background: none;
 		color: var(--fg-subtle);
 		text-align: left;
 		cursor: pointer;
+		transition:
+			color var(--dur-micro) var(--ease),
+			background-color var(--dur-micro) var(--ease);
 	}
 
 	.am__trigger:hover,
 	.am__trigger[aria-expanded='true'] {
 		background: var(--surface-hover);
+		color: var(--fg-muted);
 	}
 
 	.am__avatar {
@@ -98,10 +103,9 @@
 		flex: none;
 		width: 1.75rem;
 		height: 1.75rem;
-		border-radius: 0;
+		border-radius: var(--radius);
 		background: var(--avatar);
-		box-shadow: 0 0 0 1px var(--accent-line);
-		color: var(--accent-fg);
+		color: var(--avatar-fg);
 		font-size: var(--text-sm);
 		font-weight: 600;
 	}
@@ -110,7 +114,7 @@
 		display: grid;
 		flex: 1;
 		min-width: 0;
-		line-height: 1.3;
+		line-height: 1.25;
 	}
 
 	.am__name {
@@ -118,6 +122,7 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: var(--fg);
+		font-size: var(--text-sm);
 		font-weight: 500;
 	}
 
@@ -127,24 +132,38 @@
 		text-transform: capitalize;
 	}
 
+	.am__chev {
+		display: grid;
+		flex: none;
+	}
+
 	.am__menu {
 		position: absolute;
 		left: 0;
 		right: 0;
-		bottom: calc(100% + var(--space-1));
+		bottom: calc(100% + var(--space-2));
 		z-index: 20;
 		display: grid;
+		gap: 1px;
 		padding: var(--space-1);
-		border-radius: var(--radius-lg);
+		border-radius: var(--radius-xl);
 		background: var(--surface-raised);
 		box-shadow: var(--shadow-pop);
+		animation: pop var(--dur-short) var(--ease);
+	}
+
+	@keyframes pop {
+		from {
+			opacity: 0;
+			transform: translateY(4px) scale(0.98);
+		}
 	}
 
 	.am__head {
 		display: grid;
 		padding: var(--space-2);
 		margin-bottom: var(--space-1);
-		border-bottom: 1px solid var(--border);
+		border-bottom: 1px solid var(--border-strong);
 		line-height: 1.35;
 	}
 
@@ -156,25 +175,32 @@
 		height: 2rem;
 		padding: 0 var(--space-2);
 		border: 0;
-		border-radius: var(--radius-sm);
+		border-radius: var(--radius);
 		background: none;
 		color: var(--fg-muted);
-		font-size: var(--text-base);
+		font-size: var(--text-sm);
 		text-align: left;
 		cursor: pointer;
+		transition:
+			color var(--dur-micro) var(--ease),
+			background-color var(--dur-micro) var(--ease);
 	}
 
 	.am__menu a:hover,
 	.am__menu button:hover {
-		background: var(--surface-hover);
+		background: var(--surface-active);
 		color: var(--fg);
 		text-decoration: none;
+	}
+
+	.am__menu :focus-visible {
+		outline-offset: -2px;
 	}
 
 	.am__version {
 		padding: var(--space-2) var(--space-2) var(--space-1);
 		margin-top: var(--space-1);
-		border-top: 1px solid var(--border);
+		border-top: 1px solid var(--border-strong);
 		color: var(--fg-subtle);
 		font-size: var(--text-xs);
 	}

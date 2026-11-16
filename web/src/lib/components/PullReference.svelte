@@ -66,11 +66,23 @@
 	.pull__line :global(.btn) {
 		height: 1.625rem;
 		width: 1.625rem;
+		border-radius: var(--radius-xs);
 	}
 
+	/* On a phone the reference is the point of the block: wrap it instead of cutting it off. */
 	@media (max-width: 30rem) {
 		.pull {
 			flex-wrap: wrap;
+		}
+
+		.pull__line {
+			height: auto;
+			min-height: var(--control-h);
+		}
+
+		code {
+			overflow-wrap: anywhere;
+			white-space: normal;
 		}
 	}
 </style>

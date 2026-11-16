@@ -33,10 +33,11 @@
 		display: flex;
 		align-items: flex-start;
 		gap: var(--space-3);
-		padding: var(--space-3);
-		border-radius: var(--radius-lg);
+		padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+		border-radius: var(--radius-xl);
 		background: var(--surface-raised);
 		box-shadow: var(--shadow-pop);
+		font-size: var(--text-sm);
 		pointer-events: auto;
 	}
 
@@ -45,18 +46,6 @@
 	}
 
 	/* The accent bar marks the tone at a glance without tinting the whole toast. */
-	.toast--success {
-		box-shadow:
-			var(--shadow-pop),
-			inset 2px 0 0 var(--accent);
-	}
-
-	.toast--danger {
-		box-shadow:
-			var(--shadow-pop),
-			inset 2px 0 0 var(--danger);
-	}
-
 	.toast--success > :global(.icon) {
 		color: var(--accent);
 	}
@@ -78,7 +67,7 @@
 		height: 1.25rem;
 		padding: 0;
 		border: 0;
-		border-radius: var(--radius-sm);
+		border-radius: var(--radius-xs);
 		background: none;
 		color: var(--fg-subtle);
 		cursor: pointer;

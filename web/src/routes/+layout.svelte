@@ -37,6 +37,8 @@
 	afterNavigate(() => (menuOpen = false));
 
 	const nav = $derived(groupNav(visibleNav(session.me)));
+	// The registry's own address, the name people push to; shown under the wordmark.
+	const host = $derived(page.url.host);
 </script>
 
 <svelte:head>
@@ -50,8 +52,11 @@
 		<aside class="sidebar" class:is-open={menuOpen}>
 			<div class="sidebar__top">
 				<a class="brand" href="/" aria-label="doreg home">
-					<Logo />
-					<span>doreg</span>
+					<Logo size={24} />
+					<span class="brand__text">
+						<span class="brand__name">doreg</span>
+						<span class="brand__host" title="Registry host">{host}</span>
+					</span>
 				</a>
 				<button
 					type="button"
@@ -76,7 +81,7 @@
 									aria-current={isActive(item, page.url.pathname) ? 'page' : undefined}
 								>
 									<Icon name={item.icon} size={16} />
-									{item.label}
+									<span>{item.label}</span>
 								</a>
 							{/each}
 						</div>
@@ -117,7 +122,6 @@
 		display: flex;
 		flex-direction: column;
 		height: 100dvh;
-		padding: var(--space-3);
 		border-right: 1px solid var(--border);
 		background: var(--bg-sidebar);
 	}
@@ -126,33 +130,61 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: var(--space-1) var(--space-2) var(--space-5);
+		gap: var(--space-2);
+		padding: var(--space-3) var(--space-3) var(--space-2);
 	}
 
 	.brand {
-		display: inline-flex;
+		display: flex;
 		align-items: center;
-		gap: var(--space-2);
+		gap: var(--space-3);
+		min-width: 0;
+		padding: var(--space-1);
+		border-radius: var(--radius);
 		color: var(--fg);
-		font-size: 1.0625rem;
-		font-weight: 700;
-		letter-spacing: -0.03em;
 	}
 
 	.brand:hover {
 		text-decoration: none;
 	}
 
+	.brand :global(svg) {
+		flex: none;
+	}
+
+	.brand__text {
+		display: grid;
+		min-width: 0;
+		line-height: 1.2;
+	}
+
+	.brand__name {
+		font-size: var(--text-base);
+		font-weight: 600;
+		letter-spacing: -0.01em;
+	}
+
+	.brand__host {
+		overflow: hidden;
+		color: var(--fg-subtle);
+		font-size: var(--text-xs);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
 	.sidebar__toggle {
 		display: none;
 		place-items: center;
-		width: 2rem;
-		height: 2rem;
-		border: 0;
+		width: 2.25rem;
+		height: 2.25rem;
+		border: 1px solid var(--border);
 		border-radius: var(--radius);
 		background: none;
 		color: var(--fg-muted);
 		cursor: pointer;
+		transition:
+			color var(--dur-micro) var(--ease),
+			background-color var(--dur-micro) var(--ease);
 	}
 
 	.sidebar__toggle:hover {
@@ -168,7 +200,10 @@
 	}
 
 	nav {
+		display: grid;
+		gap: var(--space-4);
 		overflow-y: auto;
+		padding: var(--space-3) var(--space-3) var(--space-4);
 	}
 
 	.nav-group {
@@ -176,19 +211,13 @@
 		gap: 1px;
 	}
 
-	/* Rim parts sections with a hairline above the head, never with a box. */
-	.nav-group + .nav-group {
-		margin-top: var(--space-4);
-		padding-top: var(--space-3);
-		border-top: 1px solid var(--border);
-	}
-
 	.nav-group__label {
 		padding: 0 var(--space-2);
 		margin-bottom: var(--space-1);
+		color: var(--fg-subtle);
 		font-size: var(--text-xs);
 		font-weight: 500;
-		color: var(--fg-subtle);
+		line-height: 1.5rem;
 	}
 
 	.nav-link {
@@ -199,11 +228,17 @@
 		padding: 0 var(--space-2);
 		border-radius: var(--radius);
 		color: var(--fg-muted);
+		font-size: var(--text-base);
 		font-weight: 500;
+		transition:
+			color var(--dur-micro) var(--ease),
+			background-color var(--dur-micro) var(--ease);
 	}
 
 	.nav-link :global(.icon) {
-		color: var(--fg-subtle);
+		flex: none;
+		color: var(--icon);
+		transition: color var(--dur-micro) var(--ease);
 	}
 
 	.nav-link:hover {
@@ -212,31 +247,32 @@
 		text-decoration: none;
 	}
 
+	.nav-link:hover :global(.icon) {
+		color: var(--fg-muted);
+	}
+
 	.nav-link:active {
 		background: var(--surface-active);
 	}
 
-	/* The current place: a lifted row and the lime square, the same mark a chosen table row gets. */
-	.nav-link[aria-current='page'] {
-		background: var(--surface);
+	/* The current place: a filled row on a hairline, its icon in lime. */
+	.nav-link[aria-current='page'],
+	.nav-link[aria-current='page']:hover {
+		background: var(--surface-raised);
+		box-shadow:
+			0 0 0 1px var(--border),
+			var(--shadow-control);
 		color: var(--fg);
-	}
-
-	.nav-link[aria-current='page']::after {
-		content: '';
-		width: 6px;
-		height: 6px;
-		margin-left: auto;
-		background: var(--accent);
 	}
 
 	.nav-link[aria-current='page'] :global(.icon) {
-		color: var(--fg);
+		color: var(--accent);
 	}
 
 	.sidebar__foot {
 		margin-top: auto;
-		padding-top: var(--space-3);
+		padding: var(--space-2) var(--space-3) var(--space-3);
+		border-top: 1px solid var(--border);
 	}
 
 	.main {
@@ -273,13 +309,12 @@
 		.sidebar {
 			z-index: 30;
 			height: auto;
-			padding: var(--space-2) var(--space-3);
 			border-right: 0;
 			border-bottom: 1px solid var(--border);
 		}
 
 		.sidebar__top {
-			padding: 0 0 0 var(--space-1);
+			padding: var(--space-2) var(--space-3);
 		}
 
 		.sidebar__toggle {
@@ -296,8 +331,7 @@
 			top: 100%;
 			left: 0;
 			right: 0;
-			max-height: calc(100dvh - 3.25rem);
-			padding: var(--space-2) var(--space-3) var(--space-3);
+			max-height: calc(100dvh - 3.5rem);
 			border-bottom: 1px solid var(--border);
 			background: var(--bg-sidebar);
 			box-shadow: var(--shadow-drop);

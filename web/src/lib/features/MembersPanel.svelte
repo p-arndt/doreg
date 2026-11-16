@@ -71,10 +71,14 @@
 </script>
 
 <form class="add" onsubmit={add}>
-	<Select bind:value={kind} aria-label="Member type">
-		<option value="user">User</option>
-		<option value="group">SSO group</option>
-	</Select>
+	<Select
+		bind:value={kind}
+		aria-label="Member type"
+		options={[
+			{ value: 'user', label: 'User' },
+			{ value: 'group', label: 'SSO group' }
+		]}
+	/>
 	<Input
 		bind:value={subject}
 		required
@@ -82,9 +86,7 @@
 		aria-label={kind === 'user' ? 'Username' : 'Group name'}
 		class="add__subject"
 	/>
-	<Select bind:value={role} aria-label="Role">
-		{#each roles as r (r.value)}<option value={r.value}>{r.label}</option>{/each}
-	</Select>
+	<Select bind:value={role} aria-label="Role" options={roles} />
 	<Button variant="primary" type="submit" icon="plus" loading={busy}>Add</Button>
 </form>
 <p class="hint">{roles.find((r) => r.value === role)?.hint}.</p>
@@ -119,10 +121,9 @@
 							size="sm"
 							aria-label={`Role of ${m.username ?? m.group}`}
 							value={m.role}
-							onchange={(e) => setRole(m, e.currentTarget.value as MemberRole)}
-						>
-							{#each roles as r (r.value)}<option value={r.value}>{r.label}</option>{/each}
-						</Select>
+							options={roles}
+							onchange={(v) => setRole(m, v)}
+						/>
 					</td>
 					<td class="muted nowrap col-added"><Time unix={m.createdAt} /></td>
 					<td class="shrink">

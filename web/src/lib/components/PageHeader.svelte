@@ -22,9 +22,9 @@
 <header class="ph">
 	{#if crumbs.length}
 		<nav class="ph__crumbs" aria-label="Breadcrumb">
-			{#each crumbs as c (c.href)}
+			{#each crumbs as c, i (c.href)}
+				{#if i > 0}<Icon name="chevronRight" size={12} />{/if}
 				<a href={c.href}>{c.label}</a>
-				<Icon name="chevronRight" size={12} />
 			{/each}
 		</nav>
 	{/if}

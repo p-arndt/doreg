@@ -84,9 +84,10 @@
 		cursor: pointer;
 		text-decoration: none;
 		transition:
-			background-color 120ms var(--ease),
-			border-color 120ms var(--ease),
-			color 120ms var(--ease);
+			background-color var(--dur-micro) var(--ease),
+			border-color var(--dur-micro) var(--ease),
+			color var(--dur-micro) var(--ease),
+			transform var(--dur-micro) var(--ease);
 	}
 
 	.btn:hover {
@@ -112,7 +113,8 @@
 	.btn--primary {
 		background: var(--accent);
 		color: var(--fg-on-accent);
-		font-weight: 500;
+		font-weight: 600;
+		box-shadow: var(--shadow-control);
 	}
 
 	.btn--primary:hover:not(:disabled) {
@@ -120,13 +122,15 @@
 	}
 
 	.btn--secondary {
-		background: transparent;
+		background: var(--surface-raised);
 		border-color: var(--border-strong);
 		color: var(--fg);
+		box-shadow: var(--shadow-control);
 	}
 
 	.btn--secondary:hover:not(:disabled) {
-		background: var(--surface-active);
+		border-color: var(--border-hover);
+		background: color-mix(in oklab, var(--surface-raised), var(--color-ink) 4%);
 	}
 
 	.btn--ghost {
@@ -158,7 +162,7 @@
 	}
 
 	.btn:active:not(:disabled) {
-		transform: translateY(1px);
+		transform: scale(0.98);
 	}
 
 	.btn:disabled {

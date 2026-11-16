@@ -19,17 +19,21 @@
 </div>
 
 <style>
-	/* Rim and app tables: horizontal rules only, no outer frame or card. */
+	/* A rounded panel with a quiet header; rows parted by hairlines, numbers right-aligned in tabular figures. */
 	.table-wrap {
 		overflow: auto;
-		border-top: 1px solid var(--border-strong);
-		border-bottom: 1px solid var(--border-strong);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		background: var(--surface);
+		box-shadow: var(--shadow-control);
 	}
 
 	table {
 		width: 100%;
-		border-collapse: collapse;
+		border-collapse: separate;
+		border-spacing: 0;
 		font-size: var(--text-base);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.table-wrap :global(thead th) {
@@ -37,19 +41,19 @@
 		top: 0;
 		z-index: 1;
 		height: 2.25rem;
-		padding: 0 var(--space-3);
-		background: var(--bg);
-		border-bottom: 1px solid var(--border-strong);
-		color: var(--fg-muted);
-		font-size: var(--text-sm);
+		padding: 0 var(--space-4);
+		background: var(--surface);
+		border-bottom: 1px solid var(--border);
+		color: var(--fg-subtle);
+		font-size: var(--text-xs);
 		font-weight: 500;
 		text-align: left;
 		white-space: nowrap;
 	}
 
 	.table-wrap :global(tbody td) {
-		height: 2.75rem;
-		padding: var(--space-2) var(--space-3);
+		height: 2.875rem;
+		padding: var(--space-2) var(--space-4);
 		border-bottom: 1px solid var(--border);
 		vertical-align: middle;
 	}
@@ -59,47 +63,31 @@
 	}
 
 	.table-wrap :global(tbody tr) {
-		transition: background-color 80ms var(--ease);
+		transition: background-color var(--dur-micro) var(--ease);
 	}
 
 	.table-wrap :global(tbody tr:hover) {
-		background: var(--surface-hover);
+		background: var(--row-hover);
 	}
 
 	.table-wrap :global(td.right),
 	.table-wrap :global(td .measure) {
-		font-family: var(--font-mono);
-		font-size: var(--text-sm);
+		color: var(--fg-muted);
+		font-variant-numeric: tabular-nums;
 	}
 
 	.table-wrap :global(tbody tr:has(a.row-link)) {
 		cursor: pointer;
 	}
 
-	/* The row a click will open sinks to paper-3 and takes the lime square, Rim's mark for the chosen row. */
-	.table-wrap :global(tbody td:first-child),
-	.table-wrap :global(thead th:first-child) {
-		position: relative;
-		padding-left: var(--space-5);
+	/* The chosen row takes a lime wash and a lime bar on its left edge; its text stays ink. */
+	.table-wrap :global(tbody tr.is-selected),
+	.table-wrap :global(tbody tr.is-selected:hover) {
+		background: var(--row-selected);
 	}
 
-	.table-wrap :global(tbody tr:has(a.row-link):hover) {
-		background: var(--bg-sidebar);
-	}
-
-	.table-wrap :global(tbody tr:has(a.row-link):hover td:first-child::before),
-	.table-wrap :global(tbody tr.is-selected td:first-child::before) {
-		content: '';
-		position: absolute;
-		top: calc(50% - 3px);
-		left: var(--space-2);
-		width: 6px;
-		height: 6px;
-		background: var(--accent);
-	}
-
-	.table-wrap :global(tbody tr.is-selected) {
-		background: var(--surface-active);
+	.table-wrap :global(tbody tr.is-selected td:first-child) {
+		box-shadow: inset 2px 0 0 var(--accent);
 	}
 
 	.table-wrap :global(.right) {
@@ -115,7 +103,7 @@
 	@media (hover: hover) {
 		.table-wrap :global(tbody tr .row-actions) {
 			opacity: 0;
-			transition: opacity 80ms var(--ease);
+			transition: opacity var(--dur-micro) var(--ease);
 		}
 
 		.table-wrap :global(tbody tr:hover .row-actions),
@@ -127,12 +115,21 @@
 
 	/* The primary link of a row: plain text colour, the accent is for actions. */
 	.table-wrap :global(a.row-link) {
+		border-radius: var(--radius-xs);
 		color: var(--fg);
 		font-weight: 500;
+		transition: color var(--dur-micro) var(--ease);
 	}
 
 	.table-wrap :global(a.row-link:hover) {
 		color: var(--accent-fg);
 		text-decoration: none;
+	}
+
+	@media (max-width: 40rem) {
+		.table-wrap :global(thead th),
+		.table-wrap :global(tbody td) {
+			padding-inline: var(--space-3);
+		}
 	}
 </style>

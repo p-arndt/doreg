@@ -186,10 +186,13 @@
 			<div class="grid2">
 				{#if !project}
 					<Field label="Scope" hint="System robots reach every project.">
-						<Select bind:value={draft.project}>
-							<option value="">System (all projects)</option>
-							{#each projects as p (p)}<option value={p}>{p}</option>{/each}
-						</Select>
+						<Select
+							bind:value={draft.project}
+							options={[
+								{ value: '', label: 'System (all projects)' },
+								...projects.map((p) => ({ value: p, label: p }))
+							]}
+						/>
 					</Field>
 				{/if}
 				<Field label="Name" hint={`Signs in as ${prefix}${draft.name || 'name'}`}>
@@ -214,13 +217,16 @@
 		</div>
 		<div class="grid2">
 			<Field label="Expires">
-				<Select bind:value={draft.expiry}>
-					<option value="30">In 30 days</option>
-					<option value="90">In 90 days</option>
-					<option value="365">In 1 year</option>
-					<option value="date">On a date</option>
-					<option value="never">Never</option>
-				</Select>
+				<Select
+					bind:value={draft.expiry}
+					options={[
+						{ value: '30', label: 'In 30 days' },
+						{ value: '90', label: 'In 90 days' },
+						{ value: '365', label: 'In 1 year' },
+						{ value: 'date', label: 'On a date' },
+						{ value: 'never', label: 'Never' }
+					]}
+				/>
 			</Field>
 			{#if draft.expiry === 'date'}
 				<Field label="Expiry date">

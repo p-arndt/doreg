@@ -45,7 +45,7 @@
 <svelte:head><title>Sign in · doreg</title></svelte:head>
 
 <main class="login">
-	<div class="login__card ticks">
+	<div class="login__card">
 		<div class="login__head">
 			<span class="login__brand"><Logo size={22} /> doreg</span>
 			<h1>Sign in</h1>
@@ -105,7 +105,10 @@
 		width: 100%;
 		max-width: 23rem;
 		padding: var(--space-6);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-xl);
 		background: var(--surface);
+		box-shadow: var(--shadow-control), var(--shadow-drop);
 	}
 
 	.login__head {
@@ -119,7 +122,7 @@
 		gap: var(--space-2);
 		margin-bottom: var(--space-4);
 		font-weight: 600;
-		letter-spacing: -0.03em;
+		letter-spacing: -0.01em;
 	}
 
 	.login__head h1 {
@@ -162,7 +165,7 @@
 	.login__card :global(.login__sso),
 	.login__card :global(.login__submit) {
 		width: 100%;
-		height: 2.375rem;
+		height: 2.25rem;
 	}
 
 	@media (max-width: 30rem) {

@@ -33,6 +33,7 @@
 	import Time from '#lib/components/Time.svelte';
 	import Facts from '#lib/components/Facts.svelte';
 	import Fact from '#lib/components/Fact.svelte';
+	import Readout from '#lib/components/Readout.svelte';
 	import type { ManifestDetail, ProjectRole } from '#lib/types.js';
 
 	let { repo, ref }: { repo: string; ref: string } = $props();
@@ -206,8 +207,8 @@
 		<PullReference reference={pullRef} />
 		<Facts label="Manifest">
 			<Fact label="Type">{mediaTypeLabel(m.mediaType)}</Fact>
-			<Fact label={isIndex ? 'Size, all platforms' : 'Compressed size'} measure
-				>{bytes(m.summary.size)}</Fact
+			<Fact label={isIndex ? 'Size, all platforms' : 'Compressed size'} big
+				><Readout value={bytes(m.summary.size)} /></Fact
 			>
 			{#if builtAt}<Fact label="Built"><Time unix={builtAt} /></Fact>{/if}
 			<Fact label="Pushed"><Time unix={m.createdAt} /></Fact>
@@ -465,36 +466,37 @@
 
 	.strip__bar {
 		display: flex;
-		gap: 2px;
-		height: 1.75rem;
+		gap: var(--space-1);
+		height: 0.625rem;
 	}
 
 	.strip__seg {
 		flex-basis: 0;
-		min-width: 4px;
+		min-width: 6px;
 		padding: 0;
 		border: 0;
-		border-top: 3px solid transparent;
+		border-radius: var(--radius-xs);
 		background: var(--track-strong);
 		cursor: pointer;
-		transition:
-			background-color var(--dur-micro) var(--ease),
-			border-color var(--dur-micro) var(--ease);
+		transition: background-color var(--dur-micro) var(--ease);
 	}
 
 	.strip__seg:nth-child(even) {
 		background: var(--border-hover);
 	}
 
-	/* The chosen layer lifts to the ink grey and takes a lime edge; lime stays a mark, never a fill. */
-	.strip__seg:hover,
-	.strip__seg.is-on {
-		background: var(--fg-muted);
-		border-top-color: var(--accent);
+	.strip__seg:hover {
+		background: var(--fg-subtle);
+	}
+
+	/* The chosen layer is the one lime mark in the strip. */
+	.strip__seg.is-on,
+	.strip__seg.is-on:hover {
+		background: var(--accent);
 	}
 
 	.strip__seg:active {
-		background: var(--fg);
+		background: var(--fg-muted);
 	}
 
 	.strip__caption {
@@ -503,7 +505,8 @@
 		flex-wrap: wrap;
 		gap: var(--space-1) var(--space-4);
 		min-height: 1lh;
-		padding-top: var(--space-2);
+		padding-top: var(--space-3);
+		font-variant-numeric: tabular-nums;
 		font-size: var(--text-sm);
 	}
 
@@ -540,6 +543,7 @@
 		list-style: none;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
+		background: var(--surface);
 	}
 
 	.history li {
@@ -590,6 +594,7 @@
 	.raw {
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
+		background: var(--surface);
 		overflow: hidden;
 	}
 

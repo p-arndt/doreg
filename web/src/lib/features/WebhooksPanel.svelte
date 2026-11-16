@@ -175,10 +175,13 @@
 		<div class="grid2">
 			{#if !project && !draft.id}
 				<Field label="Scope" hint="System webhooks fire for every project.">
-					<Select bind:value={draft.project}>
-						<option value="">System (all projects)</option>
-						{#each projects as p (p)}<option value={p}>{p}</option>{/each}
-					</Select>
+					<Select
+						bind:value={draft.project}
+						options={[
+							{ value: '', label: 'System (all projects)' },
+							...projects.map((p) => ({ value: p, label: p }))
+						]}
+					/>
 				</Field>
 			{/if}
 			<Field label="Name">

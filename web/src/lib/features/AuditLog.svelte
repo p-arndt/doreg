@@ -154,20 +154,22 @@
 	<Select
 		aria-label="Filter by action"
 		value={filters.action}
-		onchange={(e) => setParam('action', e.currentTarget.value)}
-	>
-		<option value="">All actions</option>
-		{#each actions as a (a)}<option value={a}>{actionLabel(a)}</option>{/each}
-	</Select>
+		onchange={(v) => setParam('action', v)}
+		options={[
+			{ value: '', label: 'All actions' },
+			...actions.map((a) => ({ value: a, label: actionLabel(a) }))
+		]}
+	/>
 	{#if !project && projects.length}
 		<Select
 			aria-label="Filter by project"
 			value={filters.project}
-			onchange={(e) => setParam('project', e.currentTarget.value)}
-		>
-			<option value="">All projects</option>
-			{#each projects as p (p)}<option value={p}>{p}</option>{/each}
-		</Select>
+			onchange={(v) => setParam('project', v)}
+			options={[
+				{ value: '', label: 'All projects' },
+				...projects.map((p) => ({ value: p, label: p }))
+			]}
+		/>
 	{/if}
 </div>
 

@@ -56,8 +56,8 @@
 		height: 1rem;
 		margin: 0.125rem 0 0;
 		border: 1px solid var(--border-hover);
-		border-radius: var(--radius-sm);
-		background: var(--surface);
+		border-radius: var(--radius-xs);
+		background: var(--bg-sidebar);
 		display: grid;
 		place-content: center;
 		cursor: pointer;

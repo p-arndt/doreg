@@ -28,6 +28,7 @@
 <style>
 	.seg {
 		display: inline-flex;
+		gap: 2px;
 		padding: 2px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
@@ -35,25 +36,40 @@
 	}
 
 	button {
-		height: 1.5rem;
-		padding: 0 var(--space-2);
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		height: 1.625rem;
+		padding: 0 var(--space-3);
 		border: 0;
-		border-radius: var(--radius-sm);
+		border-radius: var(--radius-xs);
 		background: none;
-		color: var(--fg-subtle);
-		font-size: var(--text-xs);
+		color: var(--fg-muted);
+		font-size: var(--text-sm);
 		font-weight: 500;
 		white-space: nowrap;
 		cursor: pointer;
+		transition:
+			color var(--dur-micro) var(--ease),
+			background-color var(--dur-micro) var(--ease);
 	}
 
 	button:hover {
 		color: var(--fg);
 	}
 
-	button[aria-checked='true'] {
-		background: var(--accent-soft);
-		color: var(--accent-fg);
-		box-shadow: inset 0 0 0 1px var(--accent-line);
+	/* The chosen option lifts onto a raised chip. */
+	button[aria-checked='true'],
+	button[aria-checked='true']:hover {
+		background: var(--surface-raised);
+		box-shadow:
+			0 0 0 1px var(--border-strong),
+			var(--shadow-control);
+		color: var(--fg);
+	}
+
+	button:focus-visible {
+		outline: 2px solid var(--border-focus);
+		outline-offset: 1px;
 	}
 </style>

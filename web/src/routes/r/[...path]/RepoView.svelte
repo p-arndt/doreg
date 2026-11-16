@@ -24,6 +24,7 @@
 	import Time from '#lib/components/Time.svelte';
 	import Facts from '#lib/components/Facts.svelte';
 	import Fact from '#lib/components/Fact.svelte';
+	import Readout from '#lib/components/Readout.svelte';
 	import type { ProjectRole, Repo } from '#lib/types.js';
 
 	let { name }: { name: string } = $props();
@@ -139,7 +140,7 @@
 		<Facts label="Repository">
 			<Fact label="Tags" measure>{repo.tags.length}</Fact>
 			<Fact label="Untagged" measure>{repo.untagged.length}</Fact>
-			<Fact label="Stored" measure>{bytes(repo.size)}</Fact>
+			<Fact label="Stored" big><Readout value={bytes(repo.size)} /></Fact>
 			<Fact label="Created"><Time unix={repo.createdAt} /></Fact>
 		</Facts>
 	</div>
@@ -329,7 +330,7 @@
 	}
 
 	.toolbar :global(.toolbar__search) {
-		flex: 1;
+		flex: 1 1 14rem;
 		max-width: 22rem;
 	}
 
@@ -355,6 +356,7 @@
 		padding: var(--space-4);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
+		background: var(--surface);
 	}
 
 	.card--danger {

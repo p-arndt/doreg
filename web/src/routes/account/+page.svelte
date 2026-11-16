@@ -13,7 +13,7 @@
 	import Command from '#lib/components/Command.svelte';
 	import ConfirmButton from '#lib/components/ConfirmButton.svelte';
 	import SecretReveal from '#lib/components/SecretReveal.svelte';
-	import SegmentedControl from '#lib/components/SegmentedControl.svelte';
+	import ChoiceCards from '#lib/components/ChoiceCards.svelte';
 	import type { Me } from '#lib/types.js';
 
 	let current = $state('');
@@ -126,15 +126,25 @@
 
 	<Section
 		title="Copy buttons"
-		description="What copy buttons next to images put on the clipboard. Stored in this browser."
+		description="What the copy buttons next to images put on the clipboard. Saved in this browser."
 	>
-		<SegmentedControl
+		<ChoiceCards
 			label="Copy images as"
 			value={prefs.copyMode}
 			onchange={setCopyMode}
 			options={[
-				{ value: 'ref', label: `Reference: ${host}/team/api:1.0` },
-				{ value: 'command', label: 'Command: docker pull …' }
+				{
+					value: 'ref',
+					title: 'Image reference',
+					description: 'For compose files, Kubernetes manifests and FROM lines.',
+					preview: `${host}/team/api:1.0`
+				},
+				{
+					value: 'command',
+					title: 'Pull command',
+					description: 'Ready to paste into a terminal.',
+					preview: `docker pull ${host}/team/api:1.0`
+				}
 			]}
 		/>
 	</Section>
@@ -181,6 +191,7 @@
 		padding: var(--space-4);
 		border: 1px solid var(--border);
 		border-radius: var(--radius-lg);
+		background: var(--surface);
 	}
 
 	.card__text {

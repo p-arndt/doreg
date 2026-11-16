@@ -23,6 +23,7 @@
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
 		background: var(--bg-sidebar);
+		box-shadow: var(--shadow-control);
 	}
 
 	.cmd__prompt {
@@ -46,5 +47,6 @@
 	.cmd :global(.btn) {
 		height: 1.625rem;
 		width: 1.625rem;
+		border-radius: var(--radius-xs);
 	}
 </style>

@@ -18,15 +18,16 @@
 
 <style>
 	.dl {
-		border-top: 1px solid var(--border-strong);
-		border-bottom: 1px solid var(--border-strong);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-lg);
+		background: var(--surface);
 	}
 
 	.dl__row {
 		display: grid;
 		grid-template-columns: minmax(7rem, 30%) 1fr;
 		gap: var(--space-4);
-		padding: 0.625rem 0;
+		padding: 0.625rem var(--space-4);
 		border-bottom: 1px solid var(--border);
 	}
 
@@ -35,7 +36,7 @@
 	}
 
 	dt {
-		color: var(--fg-muted);
+		color: var(--fg-subtle);
 		overflow-wrap: anywhere;
 	}
 

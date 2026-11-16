@@ -133,10 +133,9 @@
 									size="sm"
 									aria-label={`Role of ${u.username}`}
 									value={u.role}
-									onchange={(e) => setRole(u, e.currentTarget.value as Role)}
-								>
-									{#each roles as r (r.value)}<option value={r.value}>{r.label}</option>{/each}
-								</Select>
+									options={roles}
+									onchange={(v) => setRole(u, v)}
+								/>
 							</td>
 							<td class="muted nowrap col-created">
 								{#if u.lastLoginAt}<Time unix={u.lastLoginAt} />{:else}<span
@@ -212,9 +211,7 @@
 				/>
 			</Field>
 			<Field label="Role" hint={roleHint}>
-				<Select bind:value={form.role}>
-					{#each roles as r (r.value)}<option value={r.value}>{r.label}</option>{/each}
-				</Select>
+				<Select bind:value={form.role} options={roles} aria-label="Role" />
 			</Field>
 			<div>
 				<Button variant="primary" type="submit" icon="plus" loading={busy}>Add user</Button>
@@ -243,8 +240,9 @@
 		flex: none;
 		width: 1.5rem;
 		height: 1.5rem;
-		border-radius: 0;
+		border-radius: var(--radius-xs);
 		background: var(--avatar);
+		color: var(--avatar-fg);
 		font-size: var(--text-xs);
 		font-weight: 600;
 	}

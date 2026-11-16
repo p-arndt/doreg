@@ -35,8 +35,9 @@
 		padding: 0 var(--space-3);
 		border: 1px solid var(--border-strong);
 		border-radius: var(--radius);
-		background: var(--bg);
+		background: var(--bg-sidebar);
 		color: var(--fg);
+		box-shadow: var(--shadow-control);
 		font-size: var(--text-base);
 		transition: border-color var(--dur-micro) var(--ease);
 	}
@@ -69,10 +70,10 @@
 		border-color: var(--border-hover);
 	}
 
-	input:focus {
-		outline: 2px solid var(--border-focus);
-		outline-offset: -1px;
-		border-color: var(--border-strong);
+	input:focus-visible {
+		outline: none;
+		border-color: var(--accent-line);
+		box-shadow: 0 0 0 3px var(--focus-ring);
 	}
 
 	input:disabled {

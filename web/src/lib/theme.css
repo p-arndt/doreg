@@ -1,7 +1,7 @@
-/* Hallmark · shape: app screen · genre: modern-minimal · theme: Rim (deal 3/3, seed self-hosted-container-registry-console-3d3a·21200c51·2026-11-16·r0) · redesign: full
- * nav: kept sidebar, grouped, the current place a lime square · signature: the image drawn as its layers, a proportional layer strip · states: loading, empty, error, full
- * axes: dark/grotesk-sans/warm · posture: committed · contrast: pass · accent: lime by request (Rim's orange) · display: Geist Variable for Switzer (self-hosted, no download) · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H3 E4 S4 R4 V4 · weakest: H, an admin tool has no hero; the layer strip and the lime square carry the identity instead */
+/* Hallmark · shape: app screen · genre: modern-minimal · redesign: full · theme: doreg warm grey dark, lime accent by request · posture: restrained · v3.0.0
+ * Calm layered warm greys (sidebar sinks, page lies flat, panels lift), considered rounding (6px controls, 10px panels,
+ * 12px cards and menus), Geist for all text and numbers (tabular figures), Geist Mono only for digests, commands and code.
+ * Lime is reserved for the primary action, focus and the current selection. Depth by lightness, a hairline and one soft drop on popovers. */
 @import url('./hallmark/tokens.css');
 @import url('./hallmark/base.css');
 
@@ -11,62 +11,67 @@
  */
 
 :root {
-	/* Warm black in three steps: paper-3 sinks, paper lies flat, paper-2 lifts. */
+	/* Warm greys in steps: the sidebar sinks, the page lies flat, panels lift, raised surfaces sit on panels. */
 	--bg: var(--color-paper);
 	--bg-sidebar: var(--color-paper-3);
 	--surface: var(--color-paper-2);
-	--surface-raised: color-mix(in oklab, var(--color-paper-2) 70%, var(--color-rule));
-	--surface-hover: color-mix(in oklab, var(--color-ink) 3.5%, transparent);
-	--surface-active: color-mix(in oklab, var(--color-ink) 7%, transparent);
+	--surface-raised: oklch(23.5% 0.008 70);
+	--surface-hover: color-mix(in oklab, var(--color-ink) 4%, transparent);
+	--surface-active: color-mix(in oklab, var(--color-ink) 7.5%, transparent);
+	--row-hover: color-mix(in oklab, var(--color-ink) 3%, transparent);
+	--row-selected: color-mix(in oklab, var(--color-accent) 6%, transparent);
 
 	--border: var(--color-rule-2);
 	--border-strong: var(--color-rule);
-	--border-hover: var(--color-muted-2);
+	--border-hover: oklch(38% 0.009 72);
 	--border-focus: var(--color-focus);
-	--focus-ring: color-mix(in oklab, var(--color-focus) 22%, transparent);
+	--focus-ring: color-mix(in oklab, var(--color-focus) 28%, transparent);
 
 	--fg: var(--color-ink);
 	--fg-muted: var(--color-muted);
-	--fg-subtle: var(--color-muted-2);
+	/* 63% lightness keeps 12px labels above 4.5:1 on panels and raised surfaces. */
+	--fg-subtle: oklch(63% 0.01 75);
+	--icon: oklch(58% 0.009 75);
 
-	/* Lime marks the action and the current state; sky blue the second state. Nothing else is coloured. */
+	/* Lime marks the primary action, focus and the current selection; sky blue the second state. */
 	--accent: var(--color-accent);
-	--accent-hover: color-mix(in oklab, var(--color-accent) 85%, var(--color-ink));
+	--accent-hover: oklch(93% 0.17 127);
 	--accent-fg: var(--color-accent);
-	--accent-soft: color-mix(in oklab, var(--color-accent) 12%, transparent);
-	--accent-line: color-mix(in oklab, var(--color-accent) 40%, transparent);
+	--accent-soft: color-mix(in oklab, var(--color-accent) 10%, transparent);
+	--accent-line: color-mix(in oklab, var(--color-accent) 35%, transparent);
 	--fg-on-accent: var(--color-accent-ink);
 	--second: var(--color-accent-2);
 	--second-soft: color-mix(in oklab, var(--color-accent-2) 14%, transparent);
 
-	--track: var(--color-rule-2);
-	--track-strong: var(--color-muted-2);
-	--avatar: var(--color-rule);
+	--track: oklch(27% 0.007 72);
+	--track-strong: oklch(48% 0.009 72);
+	--avatar: oklch(32% 0.02 127);
+	--avatar-fg: oklch(92% 0.1 127);
 	--skeleton-a: var(--color-paper-2);
 	--skeleton-b: var(--color-rule-2);
 
 	--success: var(--color-success);
 	--success-soft: color-mix(in oklab, var(--color-success) 12%, transparent);
-	--warning: oklch(80% 0.13 80);
-	--warning-soft: color-mix(in oklab, var(--warning) 12%, transparent);
-	--warning-line: color-mix(in oklab, var(--warning) 32%, transparent);
+	--warning: oklch(82% 0.13 80);
+	--warning-soft: color-mix(in oklab, var(--warning) 11%, transparent);
+	--warning-line: color-mix(in oklab, var(--warning) 30%, transparent);
 	--danger: var(--color-error);
 	--danger-solid: oklch(58% 0.17 27);
-	--danger-solid-hover: oklch(64% 0.17 27);
+	--danger-solid-hover: oklch(63% 0.17 27);
 	--danger-on: var(--color-ink);
-	--danger-soft: color-mix(in oklab, var(--color-error) 12%, transparent);
+	--danger-soft: color-mix(in oklab, var(--color-error) 11%, transparent);
 	--danger-line: color-mix(in oklab, var(--color-error) 30%, transparent);
 
 	--font-sans: var(--font-body);
 	--font-mono: var(--font-outlier);
 
-	/* App type scale (ratio about 1.15); denser than Rim's page scale, which suits a working screen. */
+	/* App type scale; denser than a page scale, which suits a working screen. */
 	--text-xs: 0.75rem;
 	--text-sm: 0.8125rem;
 	--text-base: 0.875rem;
 	--text-md: 1rem;
-	--text-lg: 1.25rem;
-	--text-xl: 1.625rem;
+	--text-lg: 1.125rem;
+	--text-xl: 1.5rem;
 
 	--space-1: 0.25rem;
 	--space-2: 0.5rem;
@@ -76,17 +81,23 @@
 	--space-6: 2rem;
 	--space-7: 3rem;
 
-	/* Rim: nothing on the screen is round. */
-	--radius-sm: 0;
-	--radius: 0;
-	--radius-lg: 0;
+	/* One radius per nesting level: small marks, controls, panels, cards and menus. */
+	--radius-xs: 4px;
+	--radius-sm: 6px;
+	--radius: 6px;
+	--radius-lg: 10px;
+	--radius-xl: 12px;
 
-	--control-h: 2.125rem;
+	--control-h: 2rem;
 	--control-h-sm: 1.75rem;
 
-	/* Depth by lightness and a hairline, never a soft shadow. */
-	--shadow-pop: 0 0 0 1px var(--border-strong);
-	--shadow-drop: none;
+	--shadow-color: oklch(5% 0.005 70 / 0.55);
+	--highlight: oklch(100% 0 0 / 0.04);
+	--shadow-pop:
+		0 0 0 1px var(--border-strong), 0 12px 32px -8px var(--shadow-color),
+		0 2px 6px -2px var(--shadow-color);
+	--shadow-drop: 0 16px 40px -12px var(--shadow-color);
+	--shadow-control: 0 1px 0 var(--highlight) inset;
 	--ease: var(--ease-out);
 }
 
@@ -120,20 +131,24 @@ figure {
 h1 {
 	max-width: none;
 	font-size: var(--text-xl);
-	line-height: 1.1;
+	font-weight: 600;
+	letter-spacing: -0.025em;
+	line-height: 1.15;
 }
 
 h2 {
 	max-width: none;
 	font-size: var(--text-md);
-	letter-spacing: -0.02em;
+	font-weight: 600;
+	letter-spacing: -0.015em;
 	line-height: 1.3;
 }
 
 h3 {
 	max-width: none;
 	font-size: var(--text-base);
-	letter-spacing: -0.01em;
+	font-weight: 600;
+	letter-spacing: -0.005em;
 }
 
 a {
@@ -153,7 +168,8 @@ kbd {
 }
 
 :not(pre) > code {
-	padding: 0.05em 0.3em;
+	padding: 0.1em 0.35em;
+	border-radius: var(--radius-xs);
 	background: var(--surface-raised);
 	color: var(--fg);
 }
@@ -179,12 +195,14 @@ textarea {
 	font-variant-numeric: tabular-nums;
 }
 
-/* Rim sets every measurement (a size, a count of bytes, a digest) in mono; labels and prose never. */
-.mono,
+/* Sizes and counts stay in the sans with tabular figures; mono is for digests, commands and code. */
 .measure {
+	font-variant-numeric: tabular-nums;
+}
+
+.mono {
 	font-family: var(--font-mono);
 	font-size: 0.92em;
-	font-variant-numeric: tabular-nums;
 }
 
 .digest {
@@ -220,31 +238,4 @@ textarea {
 	display: grid;
 	gap: var(--space-4);
 	align-content: start;
-}
-
-/* Rim's corner ticks: two 1px L shapes just outside a well, instead of a full frame. */
-.ticks {
-	position: relative;
-}
-
-.ticks::before,
-.ticks::after {
-	content: '';
-	position: absolute;
-	width: 12px;
-	height: 12px;
-	border: 0 solid var(--fg-subtle);
-	pointer-events: none;
-}
-
-.ticks::before {
-	top: -6px;
-	left: -6px;
-	border-width: 1px 0 0 1px;
-}
-
-.ticks::after {
-	right: -6px;
-	bottom: -6px;
-	border-width: 0 1px 1px 0;
 }
