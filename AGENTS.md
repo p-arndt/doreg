@@ -11,9 +11,9 @@ Self-hosted OCI container registry: Go server (`/v2/` registry API, `/api/` JSON
 - `internal/auth` — `Authenticator`: resolves Basic credentials (robot secret, user password or CLI secret) to a principal, caches them, and decides permissions in `Can`
 - `internal/events` — `Bus`: `Emit` writes the audit log and queues webhook deliveries (signed, retried); `Audit` records admin actions that are not webhook events
 - `internal/oidc` — single sign-on (OpenID Connect, PKCE); configuration from `OIDC_*`
-- `compose.yaml` — dev dependencies only: minisuite (minicloak OIDC, minibucket S3, overview) and a socat push proxy on :5050; doreg itself runs on the host via `just dev` (loads `.env`). `deploy/compose.yaml` (local disk) and `deploy/compose.s3.yaml` (blobs in a bundled RustFS) are the production examples. Env names follow the shared `OIDC_*` / `S3_*` convention.
-- `internal/meta` — SQLite metadata, one writer connection, read pool. Schema lives in `migrations/NNN_name.sql`, applied in order and tracked with `PRAGMA user_version`; each file runs in its own transaction. Projects, robots, webhooks and audit log are here too.
-- `internal/meta/migrations` — schema history. A schema change is a new numbered file; never edit a file that has been applied.
+- `compose.yaml` — dev dependencies only: minisuite (minicloak OIDC, minibucket S3, overview) and a socat push proxy on :5050; doreg itself runs on the host via `just dev` (loads `.env`). `deploy/compose.yaml` (local disk), `deploy/compose.s3.yaml` (blobs in a bundled RustFS) and `deploy/compose.postgres.yaml` (metadata in a bundled PostgreSQL) are the production examples. Env names follow the shared `OIDC_*` / `S3_*` convention.
+- `internal/meta` — metadata in SQLite or PostgreSQL (`DATABASE_URL=postgres://…`), one writer connection, read pool. Queries are written once in SQLite syntax; the PostgreSQL driver wrapper (`postgres.go`) rewrites `?` to `$n` and stores bools as 0/1. Use `RETURNING id`, never `LastInsertId`; cast `sum()` to `BIGINT`. Schema lives in `migrations/NNN_name.sql` (SQLite) and `migrations/postgres/NNN_name.sql`, applied in order and tracked with `PRAGMA user_version` / `schema_version`; each file runs in its own transaction. Projects, robots, webhooks and audit log are here too. Tests open a database with `metatest.DSN(t)` / `metatest.Open(t)`.
+- `internal/meta/migrations` — schema history. A schema change is a new numbered file in both `migrations/` and `migrations/postgres/` with the same number; never edit a file that has been applied.
 - `internal/storage` — content-addressed blob files, uploads, per-digest locks
 - `internal/api` — UI JSON API (session cookie auth): projects, members, robots, webhooks, audit log, auth and SSO login, GC, users
 - `internal/webui` — embeds `internal/webui/dist`, built from `web/` by `just web-build`
@@ -30,6 +30,6 @@ Self-hosted OCI container registry: Go server (`/v2/` registry API, `/api/` JSON
 
 ## Checks
 
-`just ci` (gofmt, vet, Go tests, UI check/lint/tests). The OCI conformance suite runs against a container: see the image `ghcr.io/opencontainers/distribution-spec/conformance:v1.1.0` with `OCI_ROOT_URL`, `OCI_NAMESPACE`, `OCI_USERNAME`/`OCI_PASSWORD` and the `OCI_TEST_*` flags.
+`just ci` (gofmt, vet, Go tests, UI check/lint/tests). `just test-postgres` runs the Go tests against the compose PostgreSQL (`DOREG_TEST_DATABASE_URL`); run it after touching SQL. The OCI conformance suite runs against a container: see the image `ghcr.io/opencontainers/distribution-spec/conformance:v1.1.0` with `OCI_ROOT_URL`, `OCI_NAMESPACE`, `OCI_USERNAME`/`OCI_PASSWORD` and the `OCI_TEST_*` flags.
 
 `just release` owns versions (stamp); never edit `VERSION` by hand.

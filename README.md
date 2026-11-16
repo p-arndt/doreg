@@ -62,7 +62,8 @@ DOREG_ADMIN_PASSWORD='choose-a-long-password' docker compose up -d
 ```
 
 [`deploy/compose.yaml`](deploy/compose.yaml) has the full version with Traefik and SSO options;
-[`deploy/compose.s3.yaml`](deploy/compose.s3.yaml) adds a bundled RustFS for S3 blob storage.
+[`deploy/compose.s3.yaml`](deploy/compose.s3.yaml) adds a bundled RustFS for S3 blob storage;
+[`deploy/compose.postgres.yaml`](deploy/compose.postgres.yaml) keeps the metadata in a bundled PostgreSQL.
 
 **2. Push something.**
 
@@ -91,7 +92,7 @@ docker push reg.example.com/my-app:1.0
 | 🪪 **Single sign-on** | Any OpenID Connect provider. `doreg login` logs docker in through the browser, no secret copying. |
 | 🔔 **Webhooks and audit log** | Signed, retried webhooks for pushes, pulls, deletes, quota hits and GC runs. Every change is in the audit log. |
 | 🚚 **Import** | Pull every repository of an existing registry (registry:2, Harbor, GHCR, ...) in from the UI. Digests stay the same, reruns skip what's done. |
-| 🪶 **Small** | One static binary or a 22 MB distroless image. SQLite plus blobs on disk or in any S3 bucket. |
+| 🪶 **Small** | One static binary or a 22 MB distroless image. SQLite (or PostgreSQL) plus blobs on disk or in any S3 bucket. |
 
 <table>
   <tr>
@@ -178,11 +179,17 @@ Everything lives in the data directory (`DOREG_DATA`, `/data` in the image) unle
 then blobs go to the bucket, which is created on startup if missing. Upload sessions stay on local disk,
 so keep the volume either way.
 
+Metadata lives in SQLite (`doreg.db` in the data directory) unless `DATABASE_URL` points to PostgreSQL,
+for example `postgres://doreg:secret@db:5432/doreg?sslmode=disable`. The schema is created on start. Run
+one doreg per database: digest locks and the GC scheduler live in the process. There is no migration
+between the two; pick one when setting up.
+
 ### Settings
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
 | `DOREG_DATA` | `./data` | Data directory: SQLite metadata, upload sessions and, without S3, the blobs. |
+| `DATABASE_URL` | | `postgres://…` URL: keep metadata in PostgreSQL instead of SQLite. |
 | `DOREG_ADDR` | `:8080` | Listen address. |
 | `DOREG_ADMIN_USER` | `admin` | With `DOREG_ADMIN_PASSWORD`: the admin created on start if no users exist. |
 | `DOREG_ADMIN_PASSWORD` | | Password of that admin. Optional with SSO. |
@@ -250,7 +257,7 @@ doreg gc --dry-run --retention
 
 ### How GC stays safe online
 
-Mark and sweep of metadata run in one SQLite write transaction; a manifest push checks its references in its own write transaction, so the two are serialised. Content younger than the grace period (default 60 minutes) is never collected, which covers clients between uploading layers and pushing the manifest. Files are deleted under a per-digest lock after their database row is gone, so a concurrent upload of the same layer never loses its file.
+Mark and sweep of metadata run in one write transaction; a manifest push checks its references in its own write transaction, and doreg funnels all writes through one database connection (on PostgreSQL too), so the two are serialised. Content younger than the grace period (default 60 minutes) is never collected, which covers clients between uploading layers and pushing the manifest. Files are deleted under a per-digest lock after their database row is gone, so a concurrent upload of the same layer never loses its file.
 
 ## 🚚 Migrating from registry:2
 
@@ -300,6 +307,7 @@ docker push localhost:5050/team/api:dev
 ```sh
 just          # list recipes
 just ci       # gofmt, vet, tests, UI check, lint and tests
+just test-postgres  # Go tests against the compose PostgreSQL (docker compose up -d postgres)
 just release  # cut a release (stamp)
 ```
 
