@@ -32,4 +32,4 @@ Self-hosted OCI container registry: Go server (`/v2/` registry API, `/api/` JSON
 
 `just ci` (gofmt, vet, Go tests, UI check/lint/tests). `just test-postgres` runs the Go tests against the compose PostgreSQL (`DOREG_TEST_DATABASE_URL`); run it after touching SQL. The OCI conformance suite runs against a container: see the image `ghcr.io/opencontainers/distribution-spec/conformance:v1.1.0` with `OCI_ROOT_URL`, `OCI_NAMESPACE`, `OCI_USERNAME`/`OCI_PASSWORD` and the `OCI_TEST_*` flags.
 
-`just release` owns versions (stamp); never edit `VERSION` by hand.
+`just release` owns versions (stamp); never edit `VERSION` or `CHANGELOG.md` by hand. Every user-facing change records a changelog entry in the same commit: `just note <added|changed|deprecated|removed|fixed|security> "text"` (writes to `.stamp/changelog`, collected into `CHANGELOG.md` at release).
