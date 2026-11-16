@@ -1,0 +1,6 @@
+.git
+data
+doreg
+web/node_modules
+web/.svelte-kit
+internal/webui/dist

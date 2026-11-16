@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    uses: p-arndt/.github/.github/workflows/go-ci.yml@v1
+    with:
+      os: '["ubuntu-latest"]'
+
+  # The UI is embedded into the binary but checked on its own.
+  web:
+    uses: p-arndt/.github/.github/workflows/sveltekit-ci.yml@v1
+    with:
+      working-directory: web

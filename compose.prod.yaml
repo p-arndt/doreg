@@ -1,0 +1,37 @@
+# Example deployment behind Traefik. Layer pushes can take minutes: raise the
+# entrypoint's readTimeout (Traefik v3 defaults to 60s), e.g.
+#   --entrypoints.websecure.transport.respondingTimeouts.readTimeout=0
+services:
+  doreg:
+    image: ghcr.io/p-arndt/doreg:latest
+    restart: unless-stopped
+    environment:
+      # Creates this admin on first start if no users exist; remove afterwards.
+      DOREG_ADMIN_USER: admin
+      DOREG_ADMIN_PASSWORD: ${DOREG_ADMIN_PASSWORD:?set DOREG_ADMIN_PASSWORD}
+      # Single sign-on (optional). Uncomment to enable OIDC login. Register
+      # https://reg.example.com/api/auth/oidc/callback as the redirect URI at the
+      # provider. Keycloak: OIDC_ISSUER=https://sso.example.com/realms/<realm>.
+      # OIDC_ISSUER: https://sso.example.com
+      # OIDC_CLIENT_ID: doreg
+      # OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set OIDC_CLIENT_SECRET}
+      # OIDC_REDIRECT_URI: https://reg.example.com/api/auth/oidc/callback
+      # OIDC_PROVIDER_NAME: SSO
+      # Members of this group or role become system admins.
+      # OIDC_ADMIN_ROLE: doreg-admins
+      # S3 object storage (optional). Blobs go to the bucket when S3_BUCKET is
+      # set; the bucket is created on start if missing. Upload sessions stay on
+      # the local data volume. AWS S3: S3_FORCE_PATH_STYLE=false.
+      # S3_ENDPOINT: https://s3.eu-central-1.amazonaws.com
+      # S3_REGION: eu-central-1
+      # S3_BUCKET: doreg
+      # S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      # S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+      # S3_FORCE_PATH_STYLE: "false"
+    volumes:
+      - doreg-data:/data
+    ports:
+      - "5000:5000"
+
+volumes:
+  doreg-data:

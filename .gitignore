@@ -1,0 +1,14 @@
+/doreg
+/doreg.exe
+/data/
+/dist/
+/build/
+node_modules/
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+.DS_Store
+/internal/webui/dist/*
+!/internal/webui/dist/.gitkeep
