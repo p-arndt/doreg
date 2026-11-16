@@ -201,17 +201,41 @@ func pathID(r *http.Request) (int64, bool) {
 	return id, err == nil
 }
 
+// maxAuditUsername bounds the attacker-chosen username of failed logins in the
+// audit log; real usernames are far shorter.
+const maxAuditUsername = 128
+
+func truncateRunes(s string, n int) string {
+	for i := range s {
+		if n == 0 {
+			return s[:i]
+		}
+		n--
+	}
+	return s
+}
+
 func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	var body struct{ Username, Password string }
 	if !decode(w, r, &body) {
 		return
 	}
+	ip := clientIP(r)
+	// Blocked attempts are not audited: logging them would let a client keep
+	// filling the audit log once it is throttled.
+	if ok, wait := a.Auth.Allowed(ip, body.Username); !ok {
+		w.Header().Set("Retry-After", auth.RetryAfter(wait))
+		writeErr(w, http.StatusTooManyRequests, "too many failed login attempts, try again later")
+		return
+	}
 	u, ok := a.Auth.CheckPassword(r.Context(), body.Username, body.Password)
 	if !ok {
-		a.Events.Audit(r.Context(), body.Username, "user", "login_failed", "", "", "", clientIP(r))
+		a.Auth.Failed(ip, body.Username)
+		a.Events.Audit(r.Context(), truncateRunes(body.Username, maxAuditUsername), "user", "login_failed", "", "", "", ip)
 		writeErr(w, http.StatusUnauthorized, "wrong username or password")
 		return
 	}
+	a.Auth.Succeeded(ip, body.Username)
 	if err := a.startSession(w, r, u); err != nil {
 		a.fail(w, r, err)
 		return

@@ -174,9 +174,17 @@ func actionFor(method string) auth.Action {
 func (h *Handler) authorize(w http.ResponseWriter, r *http.Request, rt route) (*http.Request, bool) {
 	p := auth.Anonymous
 	if name, pw, ok := r.BasicAuth(); ok {
+		ip := clientIP(r)
+		if ok, wait := h.Auth.Allowed(ip, name); !ok {
+			w.Header().Set("Retry-After", auth.RetryAfter(wait))
+			writeError(w, http.StatusTooManyRequests, "TOOMANYREQUESTS", "too many failed authentication attempts")
+			return r, false
+		}
 		if p, ok = h.Auth.Basic(r.Context(), name, pw); !ok {
+			h.Auth.Failed(ip, name)
 			return r, challenge(w)
 		}
+		h.Auth.Succeeded(ip, name)
 	}
 	r = r.WithContext(context.WithValue(r.Context(), principalKey{}, p))
 	if rt.name == "" {

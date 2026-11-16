@@ -72,6 +72,10 @@ type Authenticator struct {
 	db    *meta.DB
 	mu    sync.Mutex
 	cache map[[32]byte]cached
+
+	// Limiter throttles failed credential checks of the UI login and registry
+	// Basic auth; both share it so a client cannot split guesses across them.
+	Limiter *Limiter
 }
 
 type cached struct {
@@ -81,8 +85,19 @@ type cached struct {
 
 // New returns an Authenticator.
 func New(db *meta.DB) *Authenticator {
-	return &Authenticator{db: db, cache: map[[32]byte]cached{}}
+	return &Authenticator{db: db, cache: map[[32]byte]cached{}, Limiter: NewLimiter()}
 }
+
+// Allowed reports whether a credential check from ip for username may run.
+func (a *Authenticator) Allowed(ip, username string) (bool, time.Duration) {
+	return a.Limiter.Allowed(ip, username)
+}
+
+// Failed records a failed credential check.
+func (a *Authenticator) Failed(ip, username string) { a.Limiter.Failed(ip, username) }
+
+// Succeeded clears the failure count of ip and username.
+func (a *Authenticator) Succeeded(ip, username string) { a.Limiter.Succeeded(ip, username) }
 
 // HashPassword returns a bcrypt hash.
 func HashPassword(pw string) (string, error) {
