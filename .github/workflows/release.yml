@@ -8,7 +8,23 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  release:
+  # Publishes the GitHub Release; the image job below only pushes to GHCR.
+  binaries:
+    needs: ci
+    uses: p-arndt/.github/.github/workflows/go-release.yml@v1
+    permissions:
+      contents: write
+    with:
+      binary: doreg
+      main: ./cmd/doreg
+      archive-extra-files: README.md LICENSE
+      # The ci job already ran vet and the tests on this commit.
+      test: false
+      # The binary embeds the UI, so it is built before go build.
+      pnpm-directory: web
+      before-build: pnpm --dir web install --frozen-lockfile && pnpm --dir web build
+
+  image:
     needs: ci
     uses: p-arndt/.github/.github/workflows/container-release.yml@v1
     permissions:
@@ -16,3 +32,4 @@ jobs:
       packages: write
     with:
       image: doreg
+      changelog: none

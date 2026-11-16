@@ -147,6 +147,9 @@ It shows a code, opens the browser, and runs `docker login` once you approve. Th
 and can be revoked on the account page. `--print` hands out username and token for CI instead;
 machines without a browser can use a CLI secret from the account page as the password.
 
+Get `doreg` for Linux, macOS or Windows from the [releases](https://github.com/p-arndt/doreg/releases); it is
+the same binary that runs the server, with the web UI embedded.
+
 ### SSO settings
 
 | Variable | Default | Meaning |
