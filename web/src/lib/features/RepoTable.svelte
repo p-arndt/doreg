@@ -30,6 +30,7 @@
 						<a class="row-link" href="/r/{r.name}">{r.name}</a>
 						{#if r.public}<Badge title="Anyone can pull without signing in">Public</Badge>{/if}
 					</span>
+					{#if r.description}<span class="desc" title={r.description}>{r.description}</span>{/if}
 				</td>
 				{#if showProject}
 					<td class="col-project">
@@ -55,6 +56,18 @@
 		align-items: center;
 		gap: var(--space-2);
 		flex-wrap: wrap;
+	}
+
+	/* One line: long descriptions cut off instead of stretching the table. */
+	.desc {
+		display: block;
+		max-width: 28rem;
+		margin-top: 0.125rem;
+		overflow: hidden;
+		color: var(--fg-muted);
+		font-size: var(--text-xs);
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.project {

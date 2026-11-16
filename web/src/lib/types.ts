@@ -48,6 +48,7 @@ export interface RepoListItem {
 	size: number;
 	lastPush: number;
 	createdAt: number;
+	description?: string;
 }
 
 export interface PlatformInfo extends Platform {
@@ -75,6 +76,13 @@ export interface Repo {
 	size: number;
 	tags: { name: string; updatedAt: number; manifest: ManifestSummary }[];
 	untagged: ManifestSummary[];
+	/** Markdown source of the README; "" when there is none. */
+	readme: string;
+	/** The README rendered and sanitized by the server; safe for {@html}. */
+	readmeHtml: string;
+	description: string;
+	/** http(s) URL of the source code, or "". */
+	source: string;
 }
 
 export interface Descriptor {
