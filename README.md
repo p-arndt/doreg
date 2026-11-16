@@ -121,6 +121,7 @@ names without a slash in `library`.
 - Members are local users or OIDC groups; a user gets the highest role they hold either way.
 - Public projects allow anonymous pulls; a single repository can be made public too. Quotas (bytes, set by system admins) reject pushes that would exceed them.
 - With `DOREG_PUBLIC_BROWSE=true`, visitors who are not signed in see the public repositories in the web UI (list, tags, manifests) and a sign-in button. Everything else stays behind the login. It is off by default, because the list reveals repository names that anonymous pulls alone do not.
+- Every repository can have a Markdown README, written on its Overview tab by anyone with write access or imported once from GitHub (the importer rewrites relative links and images to GitHub). The repository page and list also show the image's `org.opencontainers.image.description` and link its `org.opencontainers.image.source`. README HTML is rendered on the server without raw HTML, so it is safe on public pages.
 - System admins can push anywhere, and a push to a new project creates it. Everyone else needs a membership.
 - System users are either `admin` or `user`; users only see what their memberships give them. Accounts with the old global `read` or `write` role became `user` on upgrade and need memberships.
 
@@ -195,6 +196,7 @@ between the two; pick one when setting up.
 | `DOREG_ADMIN_PASSWORD` | | Password of that admin. Optional with SSO. |
 | `DOREG_WEBHOOK_ALLOW_PRIVATE` | `false` | Allow webhook URLs on private networks. |
 | `DOREG_PUBLIC_BROWSE` | `false` | Show public repositories in the web UI without signing in. |
+| `DOREG_GITHUB_TOKEN` | | GitHub token for README imports: lifts the anonymous rate limit and reaches private repositories (read-only `contents` scope is enough). |
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
