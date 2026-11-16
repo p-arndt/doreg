@@ -15,6 +15,7 @@
 	import Time from '#lib/components/Time.svelte';
 	import Readout from '#lib/components/Readout.svelte';
 	import RepoTable from '#lib/features/RepoTable.svelte';
+	import { session } from '#lib/session.svelte.js';
 	import type { RepoListItem, Stats } from '#lib/types.js';
 
 	let repos = $state<RepoListItem[] | null>(null);
@@ -31,9 +32,10 @@
 	async function load() {
 		error = null;
 		try {
+			// Guests see public repositories only; storage figures stay private.
 			[repos, stats] = await Promise.all([
 				api.get<RepoListItem[]>('/api/repos'),
-				api.get<Stats>('/api/stats')
+				session.me ? api.get<Stats>('/api/stats') : null
 			]);
 		} catch (e) {
 			error = e;
@@ -65,11 +67,18 @@
 
 <svelte:head><title>Repositories · doreg</title></svelte:head>
 
-<PageHeader title="Repositories" description={`Images pushed to ${host}.`}>
-	{#snippet actions()}
-		<div class="login-cmd"><Command command={`docker login ${host}`} /></div>
-	{/snippet}
-</PageHeader>
+{#if session.me}
+	<PageHeader title="Repositories" description={`Images pushed to ${host}.`}>
+		{#snippet actions()}
+			<div class="login-cmd"><Command command={`docker login ${host}`} /></div>
+		{/snippet}
+	</PageHeader>
+{:else}
+	<PageHeader
+		title="Public repositories"
+		description={`Images anyone can pull from ${host}, no sign-in needed.`}
+	/>
+{/if}
 
 {#if stats}
 	<section class="storage" aria-label="Storage">
@@ -185,6 +194,12 @@
 	<ErrorState {error} retry={load} />
 {:else if !repos}
 	<Skeleton rows={6} columns={[4, 1, 1, 2]} />
+{:else if repos.length === 0 && !session.me}
+	<EmptyState
+		icon="box"
+		title="No public images"
+		description="Sign in to see private repositories."
+	/>
 {:else if repos.length === 0}
 	<EmptyState
 		icon="box"

@@ -209,6 +209,8 @@ export interface AuthConfig {
 	oidcName?: string;
 	/** False when only single sign-on is allowed. */
 	localLogin?: boolean;
+	/** Visitors without a session may browse public repositories. */
+	publicBrowse?: boolean;
 }
 
 export interface Project {

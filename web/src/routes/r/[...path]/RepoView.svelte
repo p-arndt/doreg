@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { api, q } from '#lib/api.js';
 	import { bytes, plural, projectOf, refPath, shortDigest } from '#lib/format.js';
-	import { hasProjectRole } from '#lib/session.svelte.js';
+	import { hasProjectRole, repoCrumbs } from '#lib/session.svelte.js';
 	import { loadProjectRole } from '#lib/projectRole.js';
 	import { notify, fail } from '#lib/toast.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
@@ -119,13 +119,7 @@
 
 <svelte:head><title>{name} · doreg</title></svelte:head>
 
-<PageHeader
-	title={name}
-	crumbs={[
-		{ href: '/projects', label: 'Projects' },
-		{ href: `/projects/${project}`, label: project }
-	]}
->
+<PageHeader title={name} crumbs={repoCrumbs(project)}>
 	{#snippet meta()}
 		{#if repo?.public}<Badge tone="accent" title="Anyone can pull without signing in">Public</Badge
 			>{/if}

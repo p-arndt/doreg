@@ -4,16 +4,15 @@
 	import '#lib/theme.css';
 	import favicon from '#lib/assets/favicon.svg';
 	import { page } from '$app/state';
-	import { afterNavigate } from '$app/navigation';
-	import { api } from '#lib/api.js';
-	import { session } from '#lib/session.svelte.js';
+	import { afterNavigate, goto } from '$app/navigation';
+	import { guestRoute, session } from '#lib/session.svelte.js';
 	import { groupNav, isActive, visibleNav } from '#lib/nav.js';
 	import Toaster from '#lib/components/Toaster.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Logo from '#lib/components/Logo.svelte';
 	import AccountMenu from '#lib/components/AccountMenu.svelte';
 	import Button from '#lib/components/Button.svelte';
-	import type { Me } from '#lib/types.js';
+	import type { AuthConfig, Me } from '#lib/types.js';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
@@ -24,16 +23,41 @@
 	// Focused flows (approving a CLI sign-in) need a session but not the app shell around them.
 	const isFocused = $derived(page.url.pathname.startsWith('/cli/'));
 
+	const loginHref = $derived(
+		`/login?next=${encodeURIComponent(page.url.pathname + page.url.search)}`
+	);
+
 	$effect(() => {
-		if (isLogin || session.me) {
+		if (isLogin || session.me || session.guest) {
 			ready = true;
 			return;
 		}
-		api
-			.get<Me>('/api/me')
-			.then((me) => (session.me = me))
-			.catch(() => {})
-			.finally(() => (ready = true));
+		resolveSession().finally(() => (ready = true));
+	});
+
+	// Without a session, a server with public browsing shows its public
+	// repositories; otherwise every page starts at the login.
+	async function resolveSession() {
+		try {
+			const res = await fetch('/api/me', { credentials: 'same-origin' });
+			if (res.ok) {
+				session.me = (await res.json()) as Me;
+				return;
+			}
+			if (res.status !== 401) return;
+			const cfg = await fetch('/api/auth/config', { credentials: 'same-origin' })
+				.then((r) => (r.ok ? (r.json() as Promise<AuthConfig>) : null))
+				.catch(() => null);
+			if (cfg?.publicBrowse) session.guest = true;
+			else await goto(loginHref);
+		} catch {
+			/* unreachable: the fallback below explains it */
+		}
+	}
+
+	const isGuest = $derived(session.guest && !session.me);
+	$effect(() => {
+		if (isGuest && !isLogin && !guestRoute(page.url.pathname)) goto(loginHref);
 	});
 
 	afterNavigate(() => (menuOpen = false));
@@ -102,7 +126,25 @@
 			</div>
 		</main>
 	</div>
-{:else if ready}
+{:else if isGuest && guestRoute(page.url.pathname)}
+	<div class="guest">
+		<header class="guest__bar">
+			<a class="brand" href="/" aria-label="doreg home">
+				<Logo size={24} />
+				<span class="brand__text">
+					<span class="brand__name">doreg</span>
+					<span class="brand__host" title="Registry host">{host}</span>
+				</span>
+			</a>
+			<Button variant="primary" size="sm" href={loginHref}>Sign in</Button>
+		</header>
+		<main class="main">
+			<div class="content">
+				{@render children()}
+			</div>
+		</main>
+	</div>
+{:else if ready && !isGuest}
 	<!-- /api/me failed with something other than 401 (which redirects). -->
 	<main class="unreachable">
 		<Logo size={32} />
@@ -287,6 +329,16 @@
 		max-width: 72rem;
 		margin: 0 auto;
 		padding: var(--space-6) var(--space-6) var(--space-7);
+	}
+
+	.guest__bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		padding: var(--space-2) var(--space-4);
+		border-bottom: 1px solid var(--border);
+		background: var(--bg-sidebar);
 	}
 
 	.unreachable {

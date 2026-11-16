@@ -4,6 +4,7 @@
 	import Badge from '#lib/components/Badge.svelte';
 	import PullCopyButton from '#lib/components/PullCopyButton.svelte';
 	import Time from '#lib/components/Time.svelte';
+	import { session } from '#lib/session.svelte.js';
 	import type { RepoListItem } from '#lib/types.js';
 
 	let { repos, showProject = true }: { repos: RepoListItem[]; showProject?: boolean } = $props();
@@ -32,7 +33,9 @@
 				</td>
 				{#if showProject}
 					<td class="col-project">
-						{#if r.project}<a class="project" href="/projects/{r.project}">{r.project}</a>{/if}
+						{#if r.project && session.me}<a class="project" href="/projects/{r.project}"
+								>{r.project}</a
+							>{:else if r.project}<span class="project">{r.project}</span>{/if}
 					</td>
 				{/if}
 				<td class="right muted">{r.tags}</td>

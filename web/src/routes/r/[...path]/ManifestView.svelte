@@ -16,7 +16,7 @@
 		refPath,
 		shortDigest
 	} from '#lib/format.js';
-	import { hasProjectRole } from '#lib/session.svelte.js';
+	import { hasProjectRole, repoCrumbs } from '#lib/session.svelte.js';
 	import { prefs } from '#lib/prefs.svelte.js';
 	import { loadProjectRole } from '#lib/projectRole.js';
 	import { notify, fail } from '#lib/toast.svelte.js';
@@ -173,8 +173,7 @@
 	}
 
 	const crumbs = $derived([
-		{ href: '/projects', label: 'Projects' },
-		{ href: `/projects/${project}`, label: project },
+		...repoCrumbs(project),
 		{ href: `/r/${repo}`, label: repo.slice(repo.indexOf('/') + 1) },
 		...(m && m.parents.length > 0
 			? [{ href: refPath(repo, m.parents[0]), label: `index ${shortDigest(m.parents[0])}` }]
