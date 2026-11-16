@@ -183,7 +183,7 @@ func (a *API) stats(w http.ResponseWriter, r *http.Request) {
 		(SELECT count(*) FROM tags),
 		(SELECT count(*) FROM manifests),
 		(SELECT count(*) FROM blobs),
-		(SELECT coalesce(sum(size), 0) FROM blobs),
+		(SELECT CAST(coalesce(sum(size), 0) AS BIGINT) FROM blobs),
 		(SELECT count(*) FROM uploads)`).Scan(&out.Repositories, &out.Tags, &out.Manifests, &out.Blobs, &out.BlobBytes, &out.Uploads)
 	if err != nil {
 		a.fail(w, r, err)
@@ -218,7 +218,7 @@ func (a *API) repos(w http.ResponseWriter, r *http.Request) {
 		SELECT r.name, r.public, r.created_at,
 			(SELECT count(*) FROM tags t WHERE t.repo_id = r.id),
 			(SELECT count(*) FROM manifests m WHERE m.repo_id = r.id),
-			(SELECT coalesce(sum(b.size), 0) FROM repo_blobs rb JOIN blobs b ON b.digest = rb.digest WHERE rb.repo_id = r.id),
+			(SELECT CAST(coalesce(sum(b.size), 0) AS BIGINT) FROM repo_blobs rb JOIN blobs b ON b.digest = rb.digest WHERE rb.repo_id = r.id),
 			coalesce((SELECT max(t.updated_at) FROM tags t WHERE t.repo_id = r.id), r.created_at)
 		FROM repositories r ORDER BY r.name`)
 	if err != nil {
@@ -346,7 +346,7 @@ func (a *API) repo(w http.ResponseWriter, r *http.Request) {
 
 	var size int64
 	_ = a.DB.R.QueryRowContext(ctx, `
-		SELECT coalesce(sum(b.size), 0) FROM repo_blobs rb JOIN blobs b ON b.digest = rb.digest WHERE rb.repo_id = ?`,
+		SELECT CAST(coalesce(sum(b.size), 0) AS BIGINT) FROM repo_blobs rb JOIN blobs b ON b.digest = rb.digest WHERE rb.repo_id = ?`,
 		repo.ID).Scan(&size)
 
 	writeJSON(w, http.StatusOK, map[string]any{

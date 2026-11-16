@@ -47,5 +47,9 @@ dev: dev-api web-dev
 build-release: web-build
     go build -trimpath -ldflags "{{_LDFLAGS}}" -o {{_BIN}} {{MAIN}}
 
+# Run the Go tests against PostgreSQL (needs `docker compose up -d postgres`).
+test-postgres:
+    DOREG_TEST_DATABASE_URL="postgres://doreg:doreg@localhost:5432/doreg?sslmode=disable" go test ./...
+
 # Every check CI runs.
 ci: fmt-check vet test web-check

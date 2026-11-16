@@ -19,6 +19,7 @@ import (
 	"github.com/p-arndt/doreg/internal/events"
 	"github.com/p-arndt/doreg/internal/importer"
 	"github.com/p-arndt/doreg/internal/meta"
+	"github.com/p-arndt/doreg/internal/meta/metatest"
 	"github.com/p-arndt/doreg/internal/oci"
 	"github.com/p-arndt/doreg/internal/registry"
 	"github.com/p-arndt/doreg/internal/storage"
@@ -49,7 +50,7 @@ func newReg(t *testing.T) *reg {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db, err := meta.Open(dir + "/doreg.db")
+	db, err := meta.Open(metatest.DSN(t))
 	if err != nil {
 		t.Fatal(err)
 	}

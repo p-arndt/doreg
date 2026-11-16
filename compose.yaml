@@ -28,6 +28,20 @@ services:
     volumes:
       - suitedata:/data
 
+  # Optional PostgreSQL for DATABASE_URL (SQLite in ./data is the default).
+  # Tests use it with: just test-postgres
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: doreg
+      POSTGRES_PASSWORD: doreg
+      POSTGRES_DB: doreg
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql
+
   # The docker daemon runs in a VM (Docker Desktop) and cannot reach a process
   # on the host's localhost:8080. This forwards localhost:5050, which the
   # daemon can reach as a published container port, to doreg on the host:
@@ -43,3 +57,4 @@ services:
 
 volumes:
   suitedata:
+  pgdata:

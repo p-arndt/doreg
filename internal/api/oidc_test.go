@@ -12,7 +12,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +24,7 @@ import (
 	"github.com/p-arndt/doreg/internal/events"
 	"github.com/p-arndt/doreg/internal/gc"
 	"github.com/p-arndt/doreg/internal/meta"
+	"github.com/p-arndt/doreg/internal/meta/metatest"
 	"github.com/p-arndt/doreg/internal/oidc"
 	"github.com/p-arndt/doreg/internal/storage"
 )
@@ -172,7 +172,7 @@ func newOIDCEnvCfg(t *testing.T, configure func(*oidc.Config)) *oidcEnv {
 	ctx := t.Context()
 	idp := newFakeIdP(t)
 	dir := t.TempDir()
-	db, err := meta.Open(filepath.Join(dir, "doreg.db"))
+	db, err := meta.Open(metatest.DSN(t))
 	if err != nil {
 		t.Fatal(err)
 	}

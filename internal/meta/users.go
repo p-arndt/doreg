@@ -115,13 +115,12 @@ func (db *DB) UpsertUser(ctx context.Context, name, hash, role string) error {
 func (db *DB) CreateOIDCUser(ctx context.Context, u User) (User, error) {
 	groups, _ := json.Marshal(u.Groups)
 	now := Now()
-	res, err := db.W.ExecContext(ctx, `
+	err := db.W.QueryRowContext(ctx, `
 		INSERT INTO users(username, password_hash, role, email, oidc_subject, groups, created_at, last_login_at)
-		VALUES(?, '', ?, ?, ?, ?, ?, ?)`, u.Username, u.Role, u.Email, u.OIDCSubject, string(groups), now, now)
+		VALUES(?, '', ?, ?, ?, ?, ?, ?) RETURNING id`, u.Username, u.Role, u.Email, u.OIDCSubject, string(groups), now, now).Scan(&u.ID)
 	if err != nil {
 		return u, err
 	}
-	u.ID, _ = res.LastInsertId()
 	u.CreatedAt, u.LastLoginAt = now, now
 	return u, nil
 }

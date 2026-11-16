@@ -14,6 +14,7 @@ import (
 
 	"github.com/p-arndt/doreg/internal/events"
 	"github.com/p-arndt/doreg/internal/meta"
+	"github.com/p-arndt/doreg/internal/meta/metatest"
 )
 
 const testSecret = "s3cret"
@@ -81,7 +82,7 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 
 func setup(t *testing.T) (*meta.DB, *events.Bus) {
 	t.Helper()
-	db, err := meta.Open(t.TempDir() + "/doreg.db")
+	db, err := meta.Open(metatest.DSN(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +342,7 @@ func TestAllowPrivateDeliversToLoopback(t *testing.T) {
 }
 
 func TestAllowPrivateReadFromEnvironment(t *testing.T) {
-	db, err := meta.Open(t.TempDir() + "/doreg.db")
+	db, err := meta.Open(metatest.DSN(t))
 	if err != nil {
 		t.Fatal(err)
 	}

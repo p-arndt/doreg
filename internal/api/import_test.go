@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/p-arndt/doreg/internal/auth"
 	"github.com/p-arndt/doreg/internal/digest"
 	"github.com/p-arndt/doreg/internal/meta"
+	"github.com/p-arndt/doreg/internal/meta/metatest"
 	"github.com/p-arndt/doreg/internal/oci"
 	"github.com/p-arndt/doreg/internal/registry"
 	"github.com/p-arndt/doreg/internal/storage"
@@ -30,7 +30,7 @@ func apitSourceRegistry(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db, err := meta.Open(filepath.Join(dir, "doreg.db"))
+	db, err := meta.Open(metatest.DSN(t))
 	if err != nil {
 		t.Fatal(err)
 	}

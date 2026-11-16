@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/p-arndt/doreg/internal/meta"
+	"github.com/p-arndt/doreg/internal/meta/metatest"
 	"github.com/p-arndt/doreg/internal/storage"
 )
 
@@ -22,7 +23,7 @@ func fixClock(t *testing.T, now int64) {
 func newCollector(t *testing.T) (*Collector, *meta.DB) {
 	t.Helper()
 	dir := t.TempDir()
-	db, err := meta.Open(dir + "/doreg.db")
+	db, err := meta.Open(metatest.DSN(t))
 	if err != nil {
 		t.Fatal(err)
 	}

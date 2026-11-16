@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
-	"path/filepath"
 	"sync"
 	"testing"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/p-arndt/doreg/internal/events"
 	"github.com/p-arndt/doreg/internal/gc"
 	"github.com/p-arndt/doreg/internal/meta"
+	"github.com/p-arndt/doreg/internal/meta/metatest"
 	"github.com/p-arndt/doreg/internal/registry"
 	"github.com/p-arndt/doreg/internal/storage"
 )
@@ -68,7 +68,7 @@ func apitNewEnv(t *testing.T) *apitEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db, err := meta.Open(filepath.Join(dir, "doreg.db"))
+	db, err := meta.Open(metatest.DSN(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -218,13 +218,11 @@ func (c *Collector) Run(ctx context.Context, opts Options) (*Run, error) {
 		opts.Trigger = "manual"
 	}
 	run := &Run{Trigger: opts.Trigger, DryRun: opts.DryRun, StartedAt: meta.Now(), Status: "running"}
-	res, err := c.DB.W.ExecContext(ctx,
-		`INSERT INTO gc_runs(trigger, dry_run, started_at, status) VALUES(?, ?, ?, 'running')`,
-		run.Trigger, run.DryRun, run.StartedAt)
-	if err != nil {
+	if err := c.DB.W.QueryRowContext(ctx,
+		`INSERT INTO gc_runs(trigger, dry_run, started_at, status) VALUES(?, ?, ?, 'running') RETURNING id`,
+		run.Trigger, run.DryRun, run.StartedAt).Scan(&run.ID); err != nil {
 		return nil, err
 	}
-	run.ID, _ = res.LastInsertId()
 
 	report, runErr := c.run(ctx, opts)
 	run.Report = report
@@ -355,27 +353,37 @@ func (c *Collector) sweep(ctx context.Context, tx *sql.Tx, s Settings, policies 
 		}
 		args = append(args, grace, s.KeepPulledUntaggedDays, pulledCutoff)
 	}
-	if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS temp.gc_live`); err != nil {
-		return err
+	// Edges from a manifest to its index children and its referrers. PostgreSQL
+	// allows only one recursive reference in a CTE, so both kinds go into one
+	// indexed table that the recursion joins once.
+	for _, q := range []string{
+		`DROP TABLE IF EXISTS gc_live`,
+		`DROP TABLE IF EXISTS gc_edges`,
+		`CREATE TEMP TABLE gc_edges AS
+			SELECT p.id AS parent, c.id AS child FROM manifests p
+				JOIN manifest_refs r ON r.manifest_id = p.id AND r.kind = 'manifest'
+				JOIN manifests c ON c.repo_id = p.repo_id AND c.digest = r.digest
+			UNION
+			SELECT p.id, s.id FROM manifests p
+				JOIN manifests s ON s.repo_id = p.repo_id AND s.subject = p.digest`,
+		`CREATE INDEX gc_edges_parent ON gc_edges(parent)`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("mark: %w", err)
+		}
 	}
 	if _, err := tx.ExecContext(ctx, `
 		CREATE TEMP TABLE gc_live AS
 		WITH RECURSIVE live(id) AS (
 			`+roots+`
 			UNION
-			SELECT c.id FROM live
-				JOIN manifests p ON p.id = live.id
-				JOIN manifest_refs r ON r.manifest_id = p.id AND r.kind = 'manifest'
-				JOIN manifests c ON c.repo_id = p.repo_id AND c.digest = r.digest
-			UNION
-			SELECT s.id FROM live
-				JOIN manifests p ON p.id = live.id
-				JOIN manifests s ON s.repo_id = p.repo_id AND s.subject = p.digest
+			SELECT e.child FROM live JOIN gc_edges e ON e.parent = live.id
 		)
 		SELECT id FROM live`, args...); err != nil {
 		return fmt.Errorf("mark: %w", err)
 	}
-	defer tx.ExecContext(ctx, `DROP TABLE IF EXISTS temp.gc_live`)
+	defer tx.ExecContext(ctx, `DROP TABLE IF EXISTS gc_edges`)
+	defer tx.ExecContext(ctx, `DROP TABLE IF EXISTS gc_live`)
 
 	// Untagged manifests that only the grace period or a recent pull keeps, so
 	// the report can explain why they were not collected.
@@ -384,16 +392,9 @@ func (c *Collector) sweep(ctx context.Context, tx *sql.Tx, s Settings, policies 
 			WITH RECURSIVE tagged(id) AS (
 				SELECT manifest_id FROM tags
 				UNION
-				SELECT c.id FROM tagged
-					JOIN manifests p ON p.id = tagged.id
-					JOIN manifest_refs r ON r.manifest_id = p.id AND r.kind = 'manifest'
-					JOIN manifests c ON c.repo_id = p.repo_id AND c.digest = r.digest
-				UNION
-				SELECT s.id FROM tagged
-					JOIN manifests p ON p.id = tagged.id
-					JOIN manifests s ON s.repo_id = p.repo_id AND s.subject = p.digest
+				SELECT e.child FROM tagged JOIN gc_edges e ON e.parent = tagged.id
 			)
-			SELECT count(*) FROM temp.gc_live WHERE id NOT IN (SELECT id FROM tagged)`).Scan(&rep.KeptRecent); err != nil {
+			SELECT count(*) FROM gc_live WHERE id NOT IN (SELECT id FROM tagged)`).Scan(&rep.KeptRecent); err != nil {
 			return fmt.Errorf("count kept: %w", err)
 		}
 	}
@@ -402,7 +403,7 @@ func (c *Collector) sweep(ctx context.Context, tx *sql.Tx, s Settings, policies 
 	rows, err := tx.QueryContext(ctx, `
 		SELECT r.name, m.digest, m.media_type, m.created_at
 		FROM manifests m JOIN repositories r ON r.id = m.repo_id
-		WHERE m.id NOT IN (SELECT id FROM temp.gc_live)
+		WHERE m.id NOT IN (SELECT id FROM gc_live)
 		ORDER BY r.name, m.created_at DESC`)
 	if err != nil {
 		return err
@@ -416,7 +417,7 @@ func (c *Collector) sweep(ctx context.Context, tx *sql.Tx, s Settings, policies 
 		rep.DeletedManifests = append(rep.DeletedManifests, d)
 	}
 	rows.Close()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM manifests WHERE id NOT IN (SELECT id FROM temp.gc_live)`); err != nil {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM manifests WHERE id NOT IN (SELECT id FROM gc_live)`); err != nil {
 		return fmt.Errorf("sweep manifests: %w", err)
 	}
 

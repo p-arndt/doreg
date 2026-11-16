@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 )
 
 // touchInterval throttles touched_at / last_pulled_at writes so pulls stay reads.
@@ -202,14 +203,10 @@ func (db *DB) PutManifest(ctx context.Context, repo string, m Manifest, refs []R
 			`SELECT id FROM manifests WHERE repo_id = ? AND digest = ?`, repoID, m.Digest).Scan(&id)
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			res, err := tx.ExecContext(ctx, `
+			if err := tx.QueryRowContext(ctx, `
 				INSERT INTO manifests(repo_id, digest, media_type, artifact_type, content, subject, created_at)
-				VALUES(?, ?, ?, ?, ?, ?, ?)`,
-				repoID, m.Digest, m.MediaType, m.ArtifactType, m.Content, m.Subject, now)
-			if err != nil {
-				return err
-			}
-			if id, err = res.LastInsertId(); err != nil {
+				VALUES(?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+				repoID, m.Digest, m.MediaType, m.ArtifactType, m.Content, m.Subject, now).Scan(&id); err != nil {
 				return err
 			}
 			for _, r := range refs {
@@ -325,7 +322,7 @@ func (db *DB) SetRepoPublic(ctx context.Context, name string, public bool) error
 func (db *DB) ListTags(ctx context.Context, repo, last string, n int) ([]string, error) {
 	rows, err := db.R.QueryContext(ctx, `
 		SELECT t.name FROM tags t JOIN repositories r ON r.id = t.repo_id
-		WHERE r.name = ? AND t.name > ? ORDER BY t.name LIMIT ?`, repo, last, n)
+		WHERE r.name = ? AND t.name > ? ORDER BY t.name LIMIT ?`, repo, last, noLimit(n))
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +341,7 @@ func (db *DB) ListTags(ctx context.Context, repo, last string, n int) ([]string,
 // ListRepoNames returns repository names in lexical order after last.
 func (db *DB) ListRepoNames(ctx context.Context, last string, n int) ([]string, error) {
 	rows, err := db.R.QueryContext(ctx,
-		`SELECT name FROM repositories WHERE name > ? ORDER BY name LIMIT ?`, last, n)
+		`SELECT name FROM repositories WHERE name > ? ORDER BY name LIMIT ?`, last, noLimit(n))
 	if err != nil {
 		return nil, err
 	}
@@ -413,4 +410,13 @@ func (db *DB) TouchUpload(ctx context.Context, id string) {
 func (db *DB) DeleteUpload(ctx context.Context, id string) error {
 	_, err := db.W.ExecContext(ctx, `DELETE FROM uploads WHERE id = ?`, id)
 	return err
+}
+
+// noLimit maps a negative page size ("all") to a LIMIT both databases accept:
+// SQLite reads a negative LIMIT as unlimited, PostgreSQL rejects it.
+func noLimit(n int) int64 {
+	if n < 0 {
+		return math.MaxInt64
+	}
+	return int64(n)
 }

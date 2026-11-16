@@ -210,13 +210,11 @@ func (db *DB) SaveWebhook(ctx context.Context, w Webhook) (int64, error) {
 		if w.ProjectID > 0 {
 			pid = w.ProjectID
 		}
-		res, err := db.W.ExecContext(ctx, `
-			INSERT INTO webhooks(project_id, name, url, secret, events, enabled, created_at) VALUES(?, ?, ?, ?, ?, ?, ?)`,
-			pid, w.Name, w.URL, w.Secret, string(events), w.Enabled, Now())
-		if err != nil {
-			return 0, err
-		}
-		return res.LastInsertId()
+		var id int64
+		err := db.W.QueryRowContext(ctx, `
+			INSERT INTO webhooks(project_id, name, url, secret, events, enabled, created_at) VALUES(?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			pid, w.Name, w.URL, w.Secret, string(events), w.Enabled, Now()).Scan(&id)
+		return id, err
 	}
 	q := `UPDATE webhooks SET name = ?, url = ?, events = ?, enabled = ?`
 	args := []any{w.Name, w.URL, string(events), w.Enabled}

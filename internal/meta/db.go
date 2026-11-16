@@ -1,5 +1,5 @@
-// Package meta is the SQLite metadata store: repositories, manifests, tags,
-// blob links, users and GC history.
+// Package meta is the metadata store (SQLite or PostgreSQL): repositories,
+// manifests, tags, blob links, users and GC history.
 package meta
 
 import (
@@ -16,7 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-//go:embed migrations/*.sql
+//go:embed migrations/*.sql migrations/postgres/*.sql
 var migrationFS embed.FS
 
 // ErrNotFound is returned when a row does not exist.
@@ -25,13 +25,47 @@ var ErrNotFound = errors.New("not found")
 // DB wraps one writer connection and a pool of readers. SQLite allows a single
 // writer; funnelling writes through one connection with BEGIN IMMEDIATE avoids
 // SQLITE_BUSY upgrade deadlocks, and readers never block on WAL.
+//
+// PostgreSQL keeps the single writer on purpose: GC mark and sweep rely on no
+// other write interleaving with their transaction, which SQLite guarantees and
+// READ COMMITTED does not. One writer connection gives the same guarantee
+// within one doreg process; several processes on one database are unsupported
+// anyway because digest locks are in-process.
 type DB struct {
-	W *sql.DB
-	R *sql.DB
+	W        *sql.DB
+	R        *sql.DB
+	Postgres bool
 }
 
-// Open opens (and migrates) the database at path.
-func Open(path string) (*DB, error) {
+// Open opens (and migrates) the database: a postgres:// or postgresql:// URL
+// selects PostgreSQL, anything else is an SQLite file path.
+func Open(dsn string) (*DB, error) {
+	if IsPostgres(dsn) {
+		return openPG(dsn)
+	}
+	return openSQLite(dsn)
+}
+
+func openPG(dsn string) (*DB, error) {
+	w, err := openPostgres(dsn)
+	if err != nil {
+		return nil, err
+	}
+	w.SetMaxOpenConns(1)
+	if err := migrate(w, true); err != nil {
+		w.Close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	r, err := openPostgres(dsn)
+	if err != nil {
+		w.Close()
+		return nil, err
+	}
+	r.SetMaxOpenConns(8)
+	return &DB{W: w, R: r, Postgres: true}, nil
+}
+
+func openSQLite(path string) (*DB, error) {
 	q := url.Values{}
 	q.Add("_pragma", "journal_mode(WAL)")
 	q.Add("_pragma", "busy_timeout(10000)")
@@ -44,7 +78,7 @@ func Open(path string) (*DB, error) {
 		return nil, err
 	}
 	w.SetMaxOpenConns(1)
-	if err := migrate(w); err != nil {
+	if err := migrate(w, false); err != nil {
 		w.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
@@ -95,16 +129,22 @@ func (db *DB) SetSetting(ctx context.Context, key, value string) error {
 	return err
 }
 
-// migrate applies migrations/NNN_*.sql in order, tracking progress in
-// PRAGMA user_version. Each file runs in its own transaction.
-func migrate(w *sql.DB) error {
-	names, err := fs.Glob(migrationFS, "migrations/*.sql")
+// migrate applies migrations/NNN_*.sql (SQLite) or migrations/postgres/NNN_*.sql
+// in order, tracking progress in PRAGMA user_version or the schema_version
+// table. Each file runs in its own transaction. Both directories keep the same
+// numbering so a schema version means the same thing on either database.
+func migrate(w *sql.DB, postgres bool) error {
+	dir := "migrations"
+	if postgres {
+		dir = "migrations/postgres"
+	}
+	names, err := fs.Glob(migrationFS, dir+"/*.sql")
 	if err != nil {
 		return err
 	}
 	sort.Strings(names)
-	var version int
-	if err := w.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+	version, err := schemaVersion(w, postgres)
+	if err != nil {
 		return err
 	}
 	for i, name := range names {
@@ -123,7 +163,7 @@ func migrate(w *sql.DB) error {
 			tx.Rollback()
 			return fmt.Errorf("%s: %w", name, err)
 		}
-		if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, i+1)); err != nil {
+		if _, err := tx.Exec(setVersionSQL(postgres, i+1)); err != nil {
 			tx.Rollback()
 			return err
 		}
@@ -132,4 +172,24 @@ func migrate(w *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+func schemaVersion(w *sql.DB, postgres bool) (int, error) {
+	var v int
+	if !postgres {
+		err := w.QueryRow(`PRAGMA user_version`).Scan(&v)
+		return v, err
+	}
+	if _, err := w.Exec(`CREATE TABLE IF NOT EXISTS schema_version (version BIGINT NOT NULL)`); err != nil {
+		return 0, err
+	}
+	err := w.QueryRow(`SELECT COALESCE(MAX(version), 0) FROM schema_version`).Scan(&v)
+	return v, err
+}
+
+func setVersionSQL(postgres bool, v int) string {
+	if postgres {
+		return fmt.Sprintf(`DELETE FROM schema_version; INSERT INTO schema_version(version) VALUES (%d)`, v)
+	}
+	return fmt.Sprintf(`PRAGMA user_version = %d`, v)
 }

@@ -104,18 +104,14 @@ func (db *DB) CreateRobot(ctx context.Context, r Robot) (Robot, error) {
 		pid = r.ProjectID
 	}
 	r.CreatedAt = Now()
-	res, err := db.W.ExecContext(ctx, `
+	err := db.W.QueryRowContext(ctx, `
 		INSERT INTO robots(name, description, project_id, secret_hash, can_push, can_delete, expires_at, created_by, created_at)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(name) DO NOTHING`,
-		r.Name, r.Description, pid, r.SecretHash, r.CanPush, r.CanDelete, r.ExpiresAt, r.CreatedBy, r.CreatedAt)
-	if err != nil {
-		return r, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(name) DO NOTHING RETURNING id`,
+		r.Name, r.Description, pid, r.SecretHash, r.CanPush, r.CanDelete, r.ExpiresAt, r.CreatedBy, r.CreatedAt).Scan(&r.ID)
+	if errors.Is(err, sql.ErrNoRows) {
 		return r, ErrExists
 	}
-	r.ID, _ = res.LastInsertId()
-	return r, nil
+	return r, err
 }
 
 // UpdateRobot changes permissions, expiry, description and the disabled flag.

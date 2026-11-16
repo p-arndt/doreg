@@ -102,17 +102,13 @@ var ErrExists = errors.New("already exists")
 // CreateProject adds a project.
 func (db *DB) CreateProject(ctx context.Context, p Project) (Project, error) {
 	p.CreatedAt = Now()
-	res, err := db.W.ExecContext(ctx,
-		`INSERT INTO projects(name, public, quota_bytes, created_at) VALUES(?, ?, ?, ?) ON CONFLICT(name) DO NOTHING`,
-		p.Name, p.Public, p.QuotaBytes, p.CreatedAt)
-	if err != nil {
-		return p, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	err := db.W.QueryRowContext(ctx,
+		`INSERT INTO projects(name, public, quota_bytes, created_at) VALUES(?, ?, ?, ?) ON CONFLICT(name) DO NOTHING RETURNING id`,
+		p.Name, p.Public, p.QuotaBytes, p.CreatedAt).Scan(&p.ID)
+	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrExists
 	}
-	p.ID, _ = res.LastInsertId()
-	return p, nil
+	return p, err
 }
 
 // EnsureProject returns the project, creating it if missing.
@@ -162,7 +158,7 @@ func (db *DB) DeleteProject(ctx context.Context, name string) error {
 func (db *DB) ProjectUsage(ctx context.Context, name string) (int64, error) {
 	var n int64
 	err := db.R.QueryRowContext(ctx, `
-		SELECT coalesce(sum(size), 0) FROM blobs WHERE digest IN (
+		SELECT CAST(coalesce(sum(size), 0) AS BIGINT) FROM blobs WHERE digest IN (
 			SELECT rb.digest FROM repo_blobs rb JOIN repositories r ON r.id = rb.repo_id WHERE `+projectRepoFilter+`)`,
 		name).Scan(&n)
 	return n, err

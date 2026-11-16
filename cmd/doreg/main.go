@@ -99,7 +99,7 @@ func open(dataDir string) (*app, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := meta.Open(filepath.Join(dataDir, "doreg.db"))
+	db, err := meta.Open(env("DATABASE_URL", filepath.Join(dataDir, "doreg.db")))
 	if err != nil {
 		return nil, err
 	}

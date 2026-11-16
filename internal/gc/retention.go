@@ -192,14 +192,12 @@ func SavePolicy(ctx context.Context, db *meta.DB, p Policy) (int64, error) {
 		return 0, err
 	}
 	if p.ID == 0 {
-		res, err := db.W.ExecContext(ctx, `
+		var id int64
+		err := db.W.QueryRowContext(ctx, `
 			INSERT INTO retention_policies(name, repo_pattern, tag_pattern, keep_pattern, keep_last, older_than_days, enabled, created_at)
-			VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
-			p.Name, p.RepoPattern, p.TagPattern, p.KeepPattern, p.KeepLast, p.OlderThanDays, p.Enabled, meta.Now())
-		if err != nil {
-			return 0, err
-		}
-		return res.LastInsertId()
+			VALUES(?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			p.Name, p.RepoPattern, p.TagPattern, p.KeepPattern, p.KeepLast, p.OlderThanDays, p.Enabled, meta.Now()).Scan(&id)
+		return id, err
 	}
 	res, err := db.W.ExecContext(ctx, `
 		UPDATE retention_policies SET name = ?, repo_pattern = ?, tag_pattern = ?, keep_pattern = ?,
