@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="dark" />
+		<meta
+			name="description"
+			content="doreg, a self-hosted OCI container registry: browse images, manage access and clean up storage."
+		/>
+		<style>
+			/* Hallmark · theme: Rim · redesign: full · shape: app screen · the stamp of record is in src/lib/theme.css */
+			html,
+			body {
+				overflow-x: clip;
+			}
+		</style>
+		<title>doreg</title>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<noscript
+			>doreg needs JavaScript for its web interface. The registry API at /v2/ works without
+			it.</noscript
+		>
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>
