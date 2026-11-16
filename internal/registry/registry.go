@@ -173,7 +173,9 @@ func actionFor(method string) auth.Action {
 // clients only send credentials after a challenge.
 func (h *Handler) authorize(w http.ResponseWriter, r *http.Request, rt route) (*http.Request, bool) {
 	p := auth.Anonymous
-	if name, pw, ok := r.BasicAuth(); ok {
+	if tp, ok := r.Context().Value(inProcessKey{}).(auth.Principal); ok {
+		p = tp
+	} else if name, pw, ok := r.BasicAuth(); ok {
 		ip := clientIP(r)
 		if ok, wait := h.Auth.Allowed(ip, name); !ok {
 			w.Header().Set("Retry-After", auth.RetryAfter(wait))
@@ -186,7 +188,11 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request, rt route) (*
 		}
 		h.Auth.Succeeded(ip, name)
 	}
-	r = r.WithContext(context.WithValue(r.Context(), principalKey{}, p))
+	ctx := context.WithValue(r.Context(), principalKey{}, p)
+	if r.Header.Get(ImportHeader) != "" && p.IsAdmin() {
+		ctx = events.WithoutWebhooks(ctx)
+	}
+	r = r.WithContext(ctx)
 	if rt.name == "" {
 		// /v2/ and the catalog need an account; the catalog filters per project.
 		if p.Kind() == "anonymous" {

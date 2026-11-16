@@ -157,6 +157,15 @@ func New(db *meta.DB, log *slog.Logger) *Bus {
 	return b
 }
 
+type quietKey struct{}
+
+// WithoutWebhooks marks ctx so Emit records events in the audit log only. An
+// import uses it: copying a registry would otherwise fire a push webhook for
+// every tag and could trigger deployments of old images.
+func WithoutWebhooks(ctx context.Context) context.Context {
+	return context.WithValue(ctx, quietKey{}, true)
+}
+
 // Emit records e and notifies subscribed webhooks. It never blocks the caller
 // on network I/O.
 func (b *Bus) Emit(ctx context.Context, e Event) {
@@ -169,6 +178,9 @@ func (b *Bus) Emit(ctx context.Context, e Event) {
 		Project: e.Project, Resource: e.resource(), Detail: e.Detail, IP: e.IP,
 	}); err != nil {
 		b.log.Error("audit write failed", "err", err)
+	}
+	if ctx.Value(quietKey{}) != nil {
+		return
 	}
 	hooks, err := b.db.WebhooksFor(ctx, e.Project, e.Action)
 	if err != nil {

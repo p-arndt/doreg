@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -239,6 +240,31 @@ func TestEmitWritesAuditRow(t *testing.T) {
 	if r.Action != events.DeleteTag || r.Actor != "alice" || r.Project != "app" ||
 		r.Resource != "app/api:1.0" || r.Detail != "manual" || r.At == 0 {
 		t.Errorf("unexpected audit row: %+v", r)
+	}
+}
+
+func TestWithoutWebhooksWritesAuditOnly(t *testing.T) {
+	db, bus := setup(t)
+	rcv := newReceiver(t)
+	ctx := context.Background()
+	addHook(t, db, meta.Webhook{Name: "system", URL: rcv.srv.URL + "/system", Events: []string{events.Push}, Enabled: true})
+
+	bus.Emit(events.WithoutWebhooks(ctx), events.Event{Action: events.Push, Repository: "app/api", Tag: "imported"})
+	bus.Emit(ctx, events.Event{Action: events.Push, Repository: "app/api", Tag: "pushed"})
+
+	// Deliveries are processed in order, so once the second arrived the first
+	// would have too.
+	waitFor(t, "delivery of the regular event", func() bool { return rcv.count("/system") >= 1 })
+	hits := rcv.get("/system")
+	if len(hits) != 1 || !strings.Contains(string(hits[0].body), `"tag":"pushed"`) {
+		t.Fatalf("webhook received %d deliveries, want only the regular event", len(hits))
+	}
+	rows, err := db.Audit(ctx, meta.AuditQuery{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 {
+		t.Errorf("audit rows = %d, want 2 (quiet events are still audited)", len(rows))
 	}
 }
 
