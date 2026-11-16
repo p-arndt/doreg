@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -184,8 +185,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, name, id string
 		if cr := r.Header.Get("Content-Range"); cr != "" {
 			start, ok := parseContentRangeStart(cr)
 			if !ok || start != size {
-				setUploadHeaders(w, name, id, size)
-				writeError(w, http.StatusRequestedRangeNotSatisfiable, "BLOB_UPLOAD_INVALID", "out of order chunk")
+				rejectChunk(w, r, name, id, size)
 				return
 			}
 		}
@@ -206,8 +206,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, name, id string
 		}
 		if cr := r.Header.Get("Content-Range"); cr != "" {
 			if start, ok := parseContentRangeStart(cr); !ok || start != size {
-				setUploadHeaders(w, name, id, size)
-				writeError(w, http.StatusRequestedRangeNotSatisfiable, "BLOB_UPLOAD_INVALID", "out of order chunk")
+				rejectChunk(w, r, name, id, size)
 				return
 			}
 		}
@@ -289,4 +288,13 @@ func (h *Handler) quotaAllows(r *http.Request, repo, dgst string, size int64) bo
 		return false
 	}
 	return true
+}
+
+// rejectChunk answers an out-of-order chunk with 416. The body is drained first
+// (bounded): answering before reading it can reset the connection, and the
+// client's next request then fails with EOF instead of a clean retry.
+func rejectChunk(w http.ResponseWriter, r *http.Request, name, id string, size int64) {
+	_, _ = io.Copy(io.Discard, io.LimitReader(r.Body, 4<<20))
+	setUploadHeaders(w, name, id, size)
+	writeError(w, http.StatusRequestedRangeNotSatisfiable, "BLOB_UPLOAD_INVALID", "out of order chunk")
 }
