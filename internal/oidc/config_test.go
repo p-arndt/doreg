@@ -13,6 +13,11 @@ func TestConfigFromEnv(t *testing.T) {
 
 	t.Setenv("OIDC_ISSUER", "http://localhost:9500/realms/dev")
 	t.Setenv("OIDC_CLIENT_ID", "doreg")
+	// `just` loads .env, which would otherwise supply these values.
+	for _, k := range []string{"OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI", "OIDC_PROVIDER_NAME", "OIDC_SCOPES",
+		"OIDC_USERNAME_CLAIM", "OIDC_GROUPS_CLAIM", "OIDC_ADMIN_ROLE", "OIDC_ADMIN_EMAILS"} {
+		t.Setenv(k, "")
+	}
 	if _, err := ConfigFromEnv(); err == nil {
 		t.Fatal("missing secret and redirect URI accepted")
 	}
