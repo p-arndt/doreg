@@ -110,6 +110,14 @@ func New(db *meta.DB, store *storage.FS, a *auth.Authenticator, collector *gc.Co
 	m.HandleFunc("PUT /api/users/{id}", api.admin(api.updateUser))
 	m.HandleFunc("DELETE /api/users/{id}", api.admin(api.deleteUser))
 	m.HandleFunc("PUT /api/me/password", api.user(api.changePassword))
+
+	m.HandleFunc("POST /api/cli/device", api.cliStart)
+	m.HandleFunc("POST /api/cli/token", api.cliPoll)
+	m.HandleFunc("GET /api/cli/device/{code}", api.user(api.cliDeviceStatus))
+	m.HandleFunc("POST /api/cli/device/{code}/approve", api.user(api.cliApprove))
+	m.HandleFunc("POST /api/cli/device/{code}/deny", api.user(api.cliDeny))
+	m.HandleFunc("GET /api/me/tokens", api.user(api.cliTokens))
+	m.HandleFunc("DELETE /api/me/tokens/{id}", api.user(api.cliRevokeToken))
 	return api
 }
 
