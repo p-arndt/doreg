@@ -33,7 +33,8 @@
 		layers: 'M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5',
 		key: 'M14.5 9.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zM13.2 12.7L21 20.5M17 16.5l2-2M19 18.5l1.5-1.5',
 		shield: 'M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6l8-3z',
-		terminal: 'M4 17l6-5-6-5M12 19h8'
+		terminal: 'M4 17l6-5-6-5M12 19h8',
+		download: 'M12 4v11M7 10l5 5 5-5M5 20h14'
 	} as const;
 	export type IconName = keyof typeof paths;
 </script>

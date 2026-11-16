@@ -28,6 +28,7 @@ describe('visibleNav', () => {
 			'/projects',
 			'/gc',
 			'/retention',
+			'/import',
 			'/audit',
 			'/webhooks',
 			'/robots',
@@ -54,6 +55,7 @@ describe('groupNav', () => {
 		expect(groups[1].items.map((i) => i.href)).toEqual([
 			'/gc',
 			'/retention',
+			'/import',
 			'/audit',
 			'/webhooks'
 		]);

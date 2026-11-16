@@ -47,6 +47,14 @@ export const navItems: NavItem[] = [
 		ready: true
 	},
 	{
+		href: '/import',
+		label: 'Import',
+		icon: 'download',
+		access: 'admin',
+		group: 'Operations',
+		ready: true
+	},
+	{
 		href: '/audit',
 		label: 'Audit log',
 		icon: 'list',

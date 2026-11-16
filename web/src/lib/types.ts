@@ -326,3 +326,32 @@ export interface CliToken {
 	expiresAt: number;
 	lastUsedAt: number;
 }
+
+/** A repository the import found in the source registry. */
+export interface ImportRepo {
+	name: string;
+	tags: string[];
+}
+
+export interface ImportProgress {
+	repositories: number;
+	tags: number;
+	tagsCopied: number;
+	tagsSkipped: number;
+	tagsFailed: number;
+	blobs: number;
+	bytes: number;
+	/** The first failures, as "repo:tag: message". */
+	errors: string[];
+}
+
+/** The current or last import from another registry. */
+export interface ImportJob {
+	source: string;
+	actor: string;
+	status: 'running' | 'done' | 'failed' | 'canceled';
+	startedAt: number;
+	finishedAt?: number;
+	error?: string;
+	progress: ImportProgress;
+}
