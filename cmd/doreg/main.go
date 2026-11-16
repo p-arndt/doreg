@@ -35,6 +35,8 @@ Usage:
   doreg user   add|set|delete|list [--data DIR] [--role admin|user] NAME
                (password is read from stdin)
   doreg gc     [--data DIR] [--dry-run] [--retention]
+  doreg login  [--docker-host HOST] [--no-browser] [--print] REGISTRY
+               (SSO login in the browser, then docker login)
   doreg version
 
 Environment:
@@ -57,6 +59,8 @@ func main() {
 		err = user(os.Args[2:])
 	case "gc":
 		err = runGC(os.Args[2:])
+	case "login":
+		err = login(os.Args[2:])
 	case "version", "--version", "-v":
 		fmt.Printf("doreg %s (commit %s, built %s)\n", buildinfo.Version, buildinfo.Commit, buildinfo.Date)
 	case "help", "--help", "-h":
