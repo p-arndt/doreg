@@ -1,28 +1,69 @@
+<div align="center">
+
+<img src="assets/logo.svg" alt="doreg logo" width="104" />
+
 # doreg
 
-A self-hosted container registry with a web UI that is pleasant to use and garbage collection that runs online, without read-only mode or downtime.
+**The container registry you'll actually enjoy opening.**
 
-- OCI distribution spec 1.1: passes the official conformance suite (pull, push, content discovery, content management), works with docker, buildx (multi-arch, SBOM/provenance attestations), containerd, podman, crane, oras.
-- Projects with per-project roles (read, write, admin), members from local users or OIDC groups, public projects, and storage quotas.
-- Robot accounts for CI: pull by default, optional push and delete, expiry, disable and secret rotation.
-- Single sign-on with any OpenID Connect provider, with an optional admin group.
-- Audit log and signed webhooks for pushes, pulls, deletes, quota hits and GC runs.
-- Online garbage collection: removes untagged manifests and unreferenced layers while pushes and pulls continue, safe against concurrent pushes. Every run can be previewed first (same code path, rolled back).
-- Retention policies: keep the newest N tags, delete tags older than X days, per repository glob, with tag filters and protected tags, and a live preview of what a policy would delete.
-- Digest-pinned deployments stay safe: untagged manifests that were pulled recently are kept.
-- Web UI: projects, repositories, tags with platforms and sizes, image layers, config, environment, labels, build history, attestations and referrers, copyable pull commands, deletes, GC history, robots, webhooks, audit log, users.
-- One static binary (or a 22 MB distroless image), SQLite metadata plus content-addressed blobs on local disk or in any S3 bucket.
+Push, pull, browse, clean up. A self-hosted OCI registry with a proper web UI, SSO, robot accounts
+and garbage collection that never asks you to go read-only. One binary, no extra services.
 
-## Install
+[![CI](https://github.com/p-arndt/doreg/actions/workflows/ci.yml/badge.svg)](https://github.com/p-arndt/doreg/actions/workflows/ci.yml)
+[![Release](https://github.com/p-arndt/doreg/actions/workflows/release.yml/badge.svg)](https://github.com/p-arndt/doreg/actions/workflows/release.yml)
+[![OCI distribution 1.1](https://img.shields.io/badge/OCI%20distribution-1.1%20conformant-b9f156)](#what-you-get)
+[![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
+[![License: MIT](https://img.shields.io/badge/license-MIT-informational)](LICENSE)
+
+[Quick start](#-quick-start) · [What you get](#what-you-get) · [Access](#-projects-robots-and-sso) · [Storage](#-storage) · [Webhooks](#-webhooks) · [Garbage collection](#-garbage-collection) · [Development](#%EF%B8%8F-development)
+
+<br />
+
+<img src="docs/screenshots/overview.png" alt="doreg: repositories across projects with storage usage" width="820" />
+
+</div>
+
+<br />
+
+`registry:2` stores images fine, but it has no UI, users live in an htpasswd file, and cleaning up
+means stopping it. Harbor fixes all that and brings a database server, Redis and half a dozen
+containers along. **doreg is the middle ground:** what a team uses every day, in one process with one
+data directory. Back up the directory and you've backed up the registry.
+
+## 🚀 Quick start
+
+**1. Run it.**
 
 ```sh
 docker run -d --name doreg -p 8080:8080 -v doreg-data:/data \
   -e DOREG_ADMIN_PASSWORD='choose-a-long-password' ghcr.io/p-arndt/doreg:latest
 ```
 
-Run it behind a TLS-terminating proxy (Traefik, Caddy, nginx); docker only sends credentials over HTTPS (except to `localhost`). See `compose.prod.yaml`. Raise the proxy's request read timeout: large layers take longer than 60 seconds.
+Or with Docker Compose:
 
-## Quick start
+```yaml
+services:
+  doreg:
+    image: ghcr.io/p-arndt/doreg:latest
+    restart: unless-stopped
+    environment:
+      DOREG_ADMIN_PASSWORD: ${DOREG_ADMIN_PASSWORD:?set DOREG_ADMIN_PASSWORD}
+    volumes:
+      - doreg-data:/data
+    ports:
+      - "8080:8080"
+
+volumes:
+  doreg-data:
+```
+
+```sh
+DOREG_ADMIN_PASSWORD='choose-a-long-password' docker compose up -d
+```
+
+[`compose.prod.yaml`](compose.prod.yaml) has the full version with Traefik, SSO and S3 options.
+
+**2. Push something.**
 
 ```sh
 docker login reg.example.com
@@ -30,24 +71,43 @@ docker tag my-app reg.example.com/my-app:1.0
 docker push reg.example.com/my-app:1.0
 ```
 
-Open `https://reg.example.com` for the UI.
+**3. Open `https://reg.example.com`** and look around.
 
-System users have one of two roles: `admin` (everything) or `user` (access only through project membership). Project access is described below.
+> [!TIP]
+> Put it behind a TLS-terminating proxy (Traefik, Caddy, nginx): docker only sends credentials over
+> HTTPS, except to `localhost`. [`compose.prod.yaml`](compose.prod.yaml) is a complete Traefik example.
+> Raise the proxy's read timeout too, since big layers take longer than 60 seconds.
 
-```sh
-echo 'secret-password' | doreg user add --role user ci
-doreg user list
-```
+## What you get
 
-Garbage collection runs every 24 hours by default (configurable in the UI). From the CLI:
+|  |  |
+|---|---|
+| 📦 **Speaks OCI 1.1** | Passes the official conformance suite. docker, buildx (multi-arch, SBOM and provenance), containerd, podman, crane and oras all just work. Manifests are served byte for byte as pushed. |
+| 🧹 **Online garbage collection** | Untagged manifests and orphaned layers go away while pushes and pulls keep running. Preview any run first: same code path, rolled back. |
+| ⏳ **Retention policies** | Keep the newest N, drop tags older than X days, per repository glob, with protected tags. Recently pulled digests survive, so pinned deployments stay safe. |
+| 🔐 **Projects and roles** | read, write and admin per project, for users or OIDC groups. Public projects and storage quotas. |
+| 🤖 **Robot accounts** | Credentials for CI: pull by default, push and delete if you say so, with expiry and secret rotation. |
+| 🪪 **Single sign-on** | Any OpenID Connect provider. `doreg login` logs docker in through the browser, no secret copying. |
+| 🔔 **Webhooks and audit log** | Signed, retried webhooks for pushes, pulls, deletes, quota hits and GC runs. Every change is in the audit log. |
+| 🪶 **Small** | One static binary or a 22 MB distroless image. SQLite plus blobs on disk or in any S3 bucket. |
 
-```sh
-doreg gc --dry-run --retention
-```
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/multi-arch.png" alt="A multi-arch image index with eight platforms" /></td>
+    <td width="33%"><img src="docs/screenshots/layers.png" alt="Image layers with their share of the total size" /></td>
+    <td width="33%"><img src="docs/screenshots/robots.png" alt="Robot accounts with scope, permissions and expiry" /></td>
+  </tr>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/gc.png" alt="Garbage collection history" /></td>
+    <td width="33%"><img src="docs/screenshots/retention.png" alt="Retention policies with protected tags" /></td>
+    <td width="33%"><img src="docs/screenshots/audit.png" alt="Audit log of users, robots and the system" /></td>
+  </tr>
+</table>
 
-## Projects and permissions
+## 🔐 Projects, robots and SSO
 
-A repository belongs to the project named by its first path segment: `team/api` is in project `team`, and names without a slash are in `library`.
+A repository belongs to the project named by its first path segment: `team/api` lives in `team`,
+names without a slash in `library`.
 
 | Role    | Pull | Push, delete tags and manifests | Members, robots, webhooks, repository settings |
 |---------|------|---------------------------------|------------------------------------------------|
@@ -55,30 +115,34 @@ A repository belongs to the project named by its first path segment: `team/api` 
 | `write` | yes  | yes                             |                                                |
 | `admin` | yes  | yes                             | yes                                            |
 
-- Members are local users or OIDC groups. A user gets the highest role they hold directly or through a group.
-- Public projects allow anonymous pull of their repositories.
-- Each project can have a storage quota in bytes (0 means no quota). Pushes that would exceed it are rejected and emit a `quota_exceeded` event. Only system admins set quotas.
-- System admins can push to any project; a push to a new project creates it. Other users need an existing project and a membership with the right role.
-- Accounts that had the old global `read` or `write` role became `user` during the upgrade; give them project memberships to restore access.
+- Members are local users or OIDC groups; a user gets the highest role they hold either way.
+- Public projects allow anonymous pulls. Quotas (bytes, set by system admins) reject pushes that would exceed them.
+- System admins can push anywhere, and a push to a new project creates it. Everyone else needs a membership.
+- System users are either `admin` or `user`; users only see what their memberships give them. Accounts with the old global `read` or `write` role became `user` on upgrade and need memberships.
 
-## Robot accounts
+```sh
+echo 'secret-password' | doreg user add --role user ci
+```
 
-Robots are non-human accounts for CI and deployments. Their names are `robot$<project>+<name>` for project robots and `robot$<name>` for system robots. Names use lowercase letters, digits and the separators `.`, `_` and `-`.
-
-- A project robot works only in its project. A system robot works in every project and can only be created by system admins.
-- Pull is always allowed. Push and delete are separate options.
-- Optional expiry; a robot can be disabled without being deleted.
-- The secret is shown once, when the robot is created or its secret is rotated. Rotating invalidates the old secret.
-
-Quote the `$` in shells:
+**Robot accounts** are named `robot$<project>+<name>` (or `robot$<name>` for system robots, which
+work in every project). Their secret is shown once, on creation or rotation. Quote the `$` in shells:
 
 ```sh
 echo "$ROBOT_SECRET" | docker login reg.example.com -u 'robot$team+ci' --password-stdin
 ```
 
-## Single sign-on (OIDC)
+**Single sign-on** turns on when `OIDC_ISSUER` is set (authorization code flow with PKCE, works with
+Authentik, Keycloak and friends). SSO users log docker in with one command:
 
-doreg logs users in through an OpenID Connect provider (authorization code flow with PKCE). It is enabled when `OIDC_ISSUER` is set.
+```sh
+doreg login reg.example.com
+```
+
+It shows a code, opens the browser, and runs `docker login` once you approve. The token lasts 90 days
+and can be revoked on the account page. `--print` hands out username and token for CI instead;
+machines without a browser can use a CLI secret from the account page as the password.
+
+### SSO settings
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
@@ -93,52 +157,33 @@ doreg logs users in through an OpenID Connect provider (authorization code flow 
 | `OIDC_ADMIN_ROLE` | empty | A group or role that makes its members system admins. |
 | `OIDC_ADMIN_EMAILS` | empty | Comma-separated emails that make their owners system admins, only if the provider marks the email as verified. |
 
-### Who becomes admin
+#### Who becomes admin
 
 1. If `OIDC_ADMIN_ROLE` or `OIDC_ADMIN_EMAILS` is set, they decide at every SSO login: users matching either become admins, everyone else is a normal user. Removing the role at the provider (or the email from the list) demotes at the next login.
 2. If neither is set, roles are managed in doreg (Users page). While the instance has no admin at all, the first person who signs in via SSO becomes admin; doreg logs a warning and an audit entry. Only accounts of your identity provider can sign in, so set one of the variables before opening a provider to the public.
 
-`DOREG_ADMIN_PASSWORD` is optional with SSO. Keep a local admin only as a fallback for when the provider is down.
+`DOREG_ADMIN_PASSWORD` is optional with SSO; keep a local admin only as a fallback for when the provider is down.
 
-Setup, with any provider (Authentik, Keycloak, and others alike):
+Setup: create a confidential OpenID client with `OIDC_REDIRECT_URI` as redirect URI, make sure the ID
+token carries groups or roles (many providers need a groups scope or mapper), set the variables and
+restart. The first SSO login creates the account; if the name is taken by a local account the SSO user
+gets a suffix (`alice-2`), local accounts are never taken over.
 
-1. Create a confidential OpenID client. Set its redirect URI to `OIDC_REDIRECT_URI`.
-2. Make sure the ID token carries the groups or roles (see `OIDC_GROUPS_CLAIM`). Many providers need an explicit groups scope or mapper for this.
-3. Set the variables above on the doreg container and restart it. The login button appears on the sign-in page.
+## 💾 Storage
 
-Notes:
+Everything lives in the data directory (`DOREG_DATA`, `/data` in the image) unless `S3_BUCKET` is set;
+then blobs go to the bucket, which is created on startup if missing. Upload sessions stay on local disk,
+so keep the volume either way.
 
-- The first SSO login creates the account. If the name is taken by a local account, the SSO user gets a suffix (`alice-2`). Local accounts are never taken over.
-- SSO accounts have no password. To use `docker login`, create a CLI secret on the account page and use it as the password. A new CLI secret replaces the old one.
-- Groups can also be project members: add an OIDC group to a project with the role you want.
+### Settings
 
-```sh
-docker login reg.example.com -u alice   # password: the CLI secret from the account page
-```
-
-### Command-line login
-
-With SSO, `doreg login` does the same without copying a secret:
-
-```sh
-doreg login reg.example.com
-```
-
-It prints a code and a link, opens the browser (`--no-browser` only prints the link), and waits until you approve the code on the account page. Then it runs `docker login` with a new token. The token is valid for 90 days and can be revoked on the account page under Command-line logins.
-
-- `--docker-host HOST` is the host passed to `docker login`, if it differs from the registry you log in to.
-- `--print` writes the username and token to stdout instead of running docker, for CI and other tools.
-- Machines without a browser can use the CLI secret from the account page, as shown above.
-
-Development setup: the UI and SSO run on Vite at localhost:5173, while pushes go through the proxy on port 5050:
-
-```sh
-doreg login --docker-host localhost:5050 localhost:5173
-```
-
-## Storage
-
-Blobs go to the data directory (`DOREG_DATA`, default `/data` in the image) unless S3 is configured. Set `S3_BUCKET` to store blobs in an S3 bucket instead. The bucket is created on startup if it is missing.
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `DOREG_DATA` | `./data` | Data directory: SQLite metadata, upload sessions and, without S3, the blobs. |
+| `DOREG_ADDR` | `:8080` | Listen address. |
+| `DOREG_ADMIN_USER` | `admin` | With `DOREG_ADMIN_PASSWORD`: the admin created on start if no users exist. |
+| `DOREG_ADMIN_PASSWORD` | | Password of that admin. Optional with SSO. |
+| `DOREG_WEBHOOK_ALLOW_PRIVATE` | `false` | Allow webhook URLs on private networks. |
 
 | Variable | Default | Meaning |
 |----------|---------|---------|
@@ -150,23 +195,21 @@ Blobs go to the data directory (`DOREG_DATA`, default `/data` in the image) unle
 | `S3_FORCE_PATH_STYLE` | | Path-style addressing: `true` for MinIO and minibucket, `false` for AWS. |
 | `S3_PREFIX` | empty | Optional key prefix inside the bucket. |
 
-Upload sessions stay on local disk in the data directory, so the data volume is still needed with S3.
+## 🔔 Webhooks
 
-## Webhooks
+Project admins add webhooks to their project, system admins add ones that hear every project. Pick
+from `push`, `pull`, `delete_tag`, `delete_manifest`, `delete_repository`, `quota_exceeded` and
+`gc_completed`; the test button sends a `ping` and every delivery attempt is listed.
 
-Project admins add webhooks to their project. System admins add system-wide webhooks, which receive events from every project. Each webhook has a URL, an optional secret and a list of events: `push`, `pull`, `delete_tag`, `delete_manifest`, `delete_repository`, `quota_exceeded`, `gc_completed`. The test button sends a `ping` event and the delivery list shows the outcome of each attempt.
+Deliveries are JSON `POST`s, signed with HMAC-SHA256 in `X-Doreg-Signature-256` when a secret is set,
+and retried after 5 and 30 seconds. Private, loopback and link-local targets are refused unless
+`DOREG_WEBHOOK_ALLOW_PRIVATE=true`, so project admins can't poke at internal services.
 
-Deliveries are `POST` requests with a JSON body and these headers:
+### Payload and signature
 
-- `X-Doreg-Event`: the event type.
-- `X-Doreg-Attempt`: 1 for the first try, then 2 and 3.
-- `X-Doreg-Signature-256`: `sha256=<hex>`, the HMAC-SHA256 of the body with the webhook secret. Sent only when a secret is set.
-
-A delivery fails on a network error or any status other than 2xx. It is retried after 5 and 30 seconds, then dropped. Redirects are not followed.
-
-Webhook URLs that resolve to loopback, private, link-local or CGNAT addresses are refused, so project admins cannot reach internal services. Set `DOREG_WEBHOOK_ALLOW_PRIVATE=true` if your receivers live on the internal network.
-
-Example body for a push (`occurredAt` is a Unix timestamp; `operatorKind` is `user`, `robot` or `anonymous`):
+Headers: `X-Doreg-Event` (the event type), `X-Doreg-Attempt` (1 to 3) and `X-Doreg-Signature-256`
+(`sha256=<hex>`). Anything other than a 2xx counts as failed; redirects are not followed.
+`occurredAt` is a Unix timestamp, `operatorKind` is `user`, `robot` or `anonymous`.
 
 ```json
 {
@@ -192,9 +235,20 @@ want := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 valid := hmac.Equal([]byte(want), []byte(r.Header.Get("X-Doreg-Signature-256")))
 ```
 
-Every change is also recorded in the audit log in the UI. Administrators see all entries; project admins see entries of their projects.
+## 🧹 Garbage collection
 
-### Migrating from registry:2
+Runs every 24 hours by default. Interval, grace period and retention policies live in the UI, and
+every run can be previewed before it deletes anything. Or from the shell:
+
+```sh
+doreg gc --dry-run --retention
+```
+
+### How GC stays safe online
+
+Mark and sweep of metadata run in one SQLite write transaction; a manifest push checks its references in its own write transaction, so the two are serialised. Content younger than the grace period (default 60 minutes) is never collected, which covers clients between uploading layers and pushing the manifest. Files are deleted under a per-digest lock after their database row is gone, so a concurrent upload of the same layer never loses its file.
+
+## 🚚 Migrating from registry:2
 
 Copy images over the API, e.g. with [regclient](https://github.com/regclient/regclient):
 
@@ -204,11 +258,7 @@ regctl repo ls old.example.com | while read repo; do
 done
 ```
 
-### How GC stays safe online
-
-Mark and sweep of metadata run in one SQLite write transaction; a manifest push checks its references in its own write transaction, so the two are serialised. Content younger than the grace period (default 60 minutes) is never collected, which covers clients between uploading layers and pushing the manifest. Files are deleted under a per-digest lock after their database row is gone, so a concurrent upload of the same layer never loses its file.
-
-## Development
+## 🛠️ Development
 
 ```sh
 cp .env.example .env
@@ -237,4 +287,4 @@ just release  # cut a release (stamp)
 
 ## License
 
-MIT
+[MIT](LICENSE)
