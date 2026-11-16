@@ -6,6 +6,7 @@ import {
 	fraction,
 	historyCommand,
 	mediaTypeLabel,
+	normalizeUserCode,
 	parseRef,
 	projectOf,
 	pullText,
@@ -156,5 +157,14 @@ describe('gbToBytes', () => {
 		expect(gbToBytes(1.5)).toBe(1_500_000_000);
 		expect(gbToBytes('')).toBe(0);
 		expect(gbToBytes(-1)).toBe(0);
+	});
+});
+
+describe('normalizeUserCode', () => {
+	it('uppercases and restores the dash', () => {
+		expect(normalizeUserCode('bcdfghjk')).toBe('BCDF-GHJK');
+		expect(normalizeUserCode(' bcdf ghjk ')).toBe('BCDF-GHJK');
+		expect(normalizeUserCode('BCDF-GHJK')).toBe('BCDF-GHJK');
+		expect(normalizeUserCode('bcd')).toBe('BCD');
 	});
 });

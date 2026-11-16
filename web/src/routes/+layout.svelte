@@ -21,6 +21,8 @@
 	let menuOpen = $state(false);
 
 	const isLogin = $derived(page.url.pathname === '/login');
+	// Focused flows (approving a CLI sign-in) need a session but not the app shell around them.
+	const isFocused = $derived(page.url.pathname.startsWith('/cli/'));
 
 	$effect(() => {
 		if (isLogin || session.me) {
@@ -46,6 +48,8 @@
 </svelte:head>
 
 {#if isLogin}
+	{@render children()}
+{:else if session.me && isFocused}
 	{@render children()}
 {:else if session.me}
 	<div class="shell">

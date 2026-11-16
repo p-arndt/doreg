@@ -291,3 +291,25 @@ export interface Delivery {
 	durationMs: number;
 	payload: string;
 }
+
+export type DeviceStatus = 'pending' | 'approved' | 'denied' | 'expired';
+
+/** A `doreg login` request waiting for the signed-in user to confirm it in the browser. */
+export interface DeviceRequest {
+	userCode: string;
+	/** The requesting machine, e.g. "macbook (darwin)". */
+	client: string;
+	createdAt: number;
+	expiresAt: number;
+	status: DeviceStatus;
+}
+
+/** A token issued to the CLI through `doreg login`. */
+export interface CliToken {
+	id: number;
+	name: string;
+	createdAt: number;
+	/** Unix seconds; 0 never expires. */
+	expiresAt: number;
+	lastUsedAt: number;
+}

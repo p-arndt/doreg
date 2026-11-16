@@ -14,7 +14,12 @@
 	import ConfirmButton from '#lib/components/ConfirmButton.svelte';
 	import SecretReveal from '#lib/components/SecretReveal.svelte';
 	import ChoiceCards from '#lib/components/ChoiceCards.svelte';
-	import type { Me } from '#lib/types.js';
+	import Table from '#lib/components/Table.svelte';
+	import EmptyState from '#lib/components/EmptyState.svelte';
+	import ErrorState from '#lib/components/ErrorState.svelte';
+	import Skeleton from '#lib/components/Skeleton.svelte';
+	import Time from '#lib/components/Time.svelte';
+	import type { CliToken, Me } from '#lib/types.js';
 
 	let current = $state('');
 	let next = $state('');
@@ -25,6 +30,29 @@
 	const host = location.host;
 	const user = $derived(session.me?.user);
 	const usesPassword = $derived(!user?.sso || !!user?.hasPassword);
+
+	let tokens = $state<CliToken[] | null>(null);
+	let tokensError = $state<unknown>(null);
+
+	async function loadTokens() {
+		tokensError = null;
+		try {
+			tokens = await api.get<CliToken[]>('/api/me/tokens');
+		} catch (e) {
+			tokensError = e;
+		}
+	}
+	loadTokens();
+
+	async function revokeToken(t: CliToken) {
+		try {
+			await api.del(`/api/me/tokens/${t.id}`);
+			notify(`Signed out ${t.name}.`);
+			await loadTokens();
+		} catch (e) {
+			fail(e);
+		}
+	}
 
 	async function refreshMe() {
 		session.me = await api.get<Me>('/api/me');
@@ -82,10 +110,66 @@
 
 <div class="layout">
 	<Section
+		title="Command-line logins"
+		description="Run this on a machine with a browser: it opens doreg, you approve, and docker is signed in."
+	>
+		<Command command={`doreg login ${host}`} />
+		<div class="tokens">
+			{#if tokensError}
+				<ErrorState error={tokensError} retry={loadTokens} />
+			{:else if !tokens}
+				<Skeleton rows={2} columns={[3, 2, 2, 1]} />
+			{:else if tokens.length === 0}
+				<EmptyState
+					icon="terminal"
+					title="No command-line logins"
+					description="Machines you sign in with doreg login show up here, and you can sign them out again."
+				/>
+			{:else}
+				<Table label="Command-line logins">
+					<thead>
+						<tr>
+							<th>Device</th>
+							<th class="col-created">Signed in</th>
+							<th>Last used</th>
+							<th class="col-expires">Expires</th>
+							<th class="shrink"><span class="visually-hidden">Actions</span></th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each tokens as t (t.id)}
+							<tr>
+								<td class="token-name">{t.name}</td>
+								<td class="muted nowrap col-created"><Time unix={t.createdAt} /></td>
+								<td class="muted nowrap"><Time unix={t.lastUsedAt} /></td>
+								<td class="muted nowrap col-expires">
+									{#if t.expiresAt}<Time unix={t.expiresAt} />{:else}never{/if}
+								</td>
+								<td class="shrink">
+									<span class="row-actions">
+										<ConfirmButton
+											label={`Revoke ${t.name}`}
+											iconOnly
+											icon="trash"
+											question="Sign out?"
+											confirmLabel="Revoke"
+											onconfirm={() => revokeToken(t)}
+										/>
+									</span>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</Table>
+			{/if}
+		</div>
+	</Section>
+
+	<Section
 		title="CLI secret"
 		description={user?.sso
-			? 'You sign in here with single sign-on, which docker cannot do. Create a secret and use it as the password for docker login.'
-			: 'A separate password for docker login, so your account password stays out of scripts and credential stores.'}
+			? 'The fallback for machines without a browser, like servers and CI: use the secret as the password for docker login.'
+			: 'The fallback for machines without a browser, like servers and CI: a separate password for docker login, so your account password stays out of scripts.'}
 	>
 		{#if secret}
 			<SecretReveal
@@ -174,7 +258,22 @@
 
 <style>
 	.layout {
-		max-width: 36rem;
+		max-width: 44rem;
+	}
+
+	.tokens {
+		margin-top: var(--space-4);
+	}
+
+	.token-name {
+		font-weight: 500;
+	}
+
+	@media (max-width: 40rem) {
+		.col-created,
+		.col-expires {
+			display: none;
+		}
 	}
 
 	.who {

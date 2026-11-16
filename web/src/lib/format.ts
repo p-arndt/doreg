@@ -170,3 +170,12 @@ export function gbToBytes(gb: number | string | null | undefined): number {
 	const n = Number(gb);
 	return Number.isFinite(n) && n > 0 ? Math.round(n * 1e9) : 0;
 }
+
+/** A device code as typed by a person: uppercase, the dash restored after four characters. */
+export function normalizeUserCode(input: string): string {
+	const raw = input
+		.toUpperCase()
+		.replace(/[^A-Z0-9]/g, '')
+		.slice(0, 8);
+	return raw.length > 4 ? `${raw.slice(0, 4)}-${raw.slice(4)}` : raw;
+}
