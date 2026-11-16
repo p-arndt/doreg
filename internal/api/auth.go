@@ -15,7 +15,7 @@ import (
 const oidcStateCookie = "doreg_oidc_state"
 
 func (a *API) authConfig(w http.ResponseWriter, r *http.Request) {
-	out := map[string]any{"oidc": a.OIDC != nil, "localLogin": true}
+	out := map[string]any{"oidc": a.OIDC != nil, "localLogin": true, "publicBrowse": a.PublicBrowse}
 	if a.OIDC != nil {
 		out["oidcName"] = a.OIDC.Name()
 	}

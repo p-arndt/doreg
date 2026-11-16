@@ -153,6 +153,7 @@ func serve(args []string) error {
 	mux.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
 	apiHandler := api.New(a.db, a.store, authn, collector, bus, provider, a.log)
 	apiHandler.Registry = reg
+	apiHandler.PublicBrowse = os.Getenv("DOREG_PUBLIC_BROWSE") == "true"
 	mux.Handle("/api/", apiHandler)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	mux.Handle("/", webui.Handler())

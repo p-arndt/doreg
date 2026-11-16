@@ -51,6 +51,7 @@ type apitEnv struct {
 	srv   *httptest.Server
 	db    *meta.DB
 	authn *auth.Authenticator
+	api   *api.API
 	admin *apitClient
 }
 
@@ -95,7 +96,7 @@ func apitNewEnv(t *testing.T) *apitEnv {
 		}
 	}
 
-	e := &apitEnv{t: t, srv: srv, db: db, authn: authn}
+	e := &apitEnv{t: t, srv: srv, db: db, authn: authn, api: handler}
 	e.admin = e.login("admin")
 	return e
 }
@@ -481,6 +482,85 @@ func TestAPIRepoVisibility(t *testing.T) {
 
 	bob.expect(http.StatusForbidden, http.MethodDelete, "/api/tag?repo=other/app&tag=latest", nil)
 	bob.expect(http.StatusForbidden, http.MethodDelete, "/api/repo?name=other/app", nil)
+}
+
+// guest returns a client without a session.
+func (e *apitEnv) guest() *apitClient {
+	return &apitClient{t: e.t, base: e.srv.URL, http: &http.Client{}}
+}
+
+func TestAPIPublicBrowse(t *testing.T) {
+	e := apitTeamEnv(t)
+	ctx := context.Background()
+	err := e.db.Tx(ctx, func(tx *sql.Tx) error {
+		for _, name := range []string{"open/app", "other/app", "other/pub", "team/app"} {
+			if _, err := meta.EnsureRepo(ctx, tx, name); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.admin.expect(http.StatusNoContent, http.MethodPatch, "/api/repo?name=other/pub", map[string]any{"public": true})
+	guest := e.guest()
+
+	var cfg struct {
+		PublicBrowse bool `json:"publicBrowse"`
+	}
+	apitDecode(t, guest.expect(http.StatusOK, http.MethodGet, "/api/auth/config", nil), &cfg)
+	if cfg.PublicBrowse {
+		t.Error("publicBrowse is on by default")
+	}
+	guest.expect(http.StatusUnauthorized, http.MethodGet, "/api/repos", nil)
+	guest.expect(http.StatusUnauthorized, http.MethodGet, "/api/repo?name=open/app", nil)
+
+	e.api.PublicBrowse = true
+	apitDecode(t, guest.expect(http.StatusOK, http.MethodGet, "/api/auth/config", nil), &cfg)
+	if !cfg.PublicBrowse {
+		t.Error("publicBrowse is off after enabling it")
+	}
+
+	var items []struct {
+		Name string `json:"name"`
+	}
+	apitDecode(t, guest.expect(http.StatusOK, http.MethodGet, "/api/repos", nil), &items)
+	got := map[string]bool{}
+	for _, it := range items {
+		got[it.Name] = true
+	}
+	want := map[string]bool{"open/app": true, "other/pub": true}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("guest sees %v, want %v", got, want)
+	}
+
+	guest.expect(http.StatusOK, http.MethodGet, "/api/repo?name=open/app", nil)
+	guest.expect(http.StatusOK, http.MethodGet, "/api/repo?name=other/pub", nil)
+	guest.expect(http.StatusUnauthorized, http.MethodGet, "/api/repo?name=other/app", nil)
+	guest.expect(http.StatusUnauthorized, http.MethodGet, "/api/repo?name=team/app", nil)
+	// A missing name in a private project looks like a private repository.
+	guest.expect(http.StatusUnauthorized, http.MethodGet, "/api/repo?name=other/missing", nil)
+	guest.expect(http.StatusNotFound, http.MethodGet, "/api/repo?name=open/missing", nil)
+	guest.expect(http.StatusUnauthorized, http.MethodGet, "/api/manifest?repo=other/app&ref=latest", nil)
+
+	for _, req := range []struct{ method, path string }{
+		{http.MethodGet, "/api/me"},
+		{http.MethodGet, "/api/stats"},
+		{http.MethodGet, "/api/projects"},
+		{http.MethodGet, "/api/projects/open"},
+		{http.MethodPatch, "/api/repo?name=open/app"},
+		{http.MethodDelete, "/api/repo?name=open/app"},
+		{http.MethodDelete, "/api/tag?repo=open/app&tag=latest"},
+		{http.MethodDelete, "/api/manifest?repo=open/app&digest=sha256:00"},
+	} {
+		guest.expect(http.StatusUnauthorized, req.method, req.path, map[string]any{"public": false})
+	}
+
+	// Signed-in users still see what their projects allow.
+	bob := e.login("bob")
+	bob.expect(http.StatusOK, http.MethodGet, "/api/repo?name=team/app", nil)
+	bob.expect(http.StatusForbidden, http.MethodGet, "/api/repo?name=other/app", nil)
 }
 
 func TestAPICrossOriginRejected(t *testing.T) {

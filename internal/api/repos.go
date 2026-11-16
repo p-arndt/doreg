@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -225,7 +226,7 @@ func (a *API) repos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rows.Close()
-	u := currentUser(r)
+	p := principal(r)
 	project := r.URL.Query().Get("project")
 	allowed := map[string]bool{}
 	out := []repoListItem{}
@@ -238,7 +239,7 @@ func (a *API) repos(w http.ResponseWriter, r *http.Request) {
 		it.Project = meta.ProjectOf(it.Name)
 		visible, seen := allowed[it.Project]
 		if !seen {
-			visible, _ = a.Auth.Can(r.Context(), auth.Principal{User: &u}, it.Project, auth.Pull)
+			visible, _ = a.Auth.Can(r.Context(), p, it.Project, auth.Pull)
 			allowed[it.Project] = visible
 		}
 		if (visible || it.Public) && (project == "" || project == it.Project) {
@@ -254,22 +255,36 @@ type tagItem struct {
 	Manifest  ManifestSummary `json:"manifest"`
 }
 
-// canRead allows pulling the repository's project or a public repository.
-func (a *API) canRead(w http.ResponseWriter, r *http.Request, repo meta.Repo) bool {
-	if repo.Public {
-		return true
+// readableRepo loads a repository the caller may pull: one in a project they
+// can pull from, or a public one. Visitors get 401 for a missing repository
+// too, so they cannot probe which private names exist.
+func (a *API) readableRepo(w http.ResponseWriter, r *http.Request, name string) (meta.Repo, bool) {
+	repo, err := a.DB.RepoByName(r.Context(), name)
+	if errors.Is(err, meta.ErrNotFound) && principal(r).Kind() == "anonymous" {
+		ok, cerr := a.Auth.Can(r.Context(), auth.Anonymous, meta.ProjectOf(name), auth.Pull)
+		if cerr != nil {
+			a.fail(w, r, cerr)
+			return repo, false
+		}
+		if !ok {
+			denied(w, auth.Anonymous)
+			return repo, false
+		}
 	}
-	return a.allow(w, r, meta.ProjectOf(repo.Name), auth.Pull)
+	if err != nil {
+		a.fail(w, r, err)
+		return repo, false
+	}
+	if repo.Public {
+		return repo, true
+	}
+	return repo, a.allow(w, r, meta.ProjectOf(repo.Name), auth.Pull)
 }
 
 func (a *API) repo(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	repo, err := a.DB.RepoByName(ctx, r.URL.Query().Get("name"))
-	if err == nil && !a.canRead(w, r, repo) {
-		return
-	}
-	if err != nil {
-		a.fail(w, r, err)
+	repo, ok := a.readableRepo(w, r, r.URL.Query().Get("name"))
+	if !ok {
 		return
 	}
 	all, err := a.loadManifests(ctx, repo.ID)
@@ -466,12 +481,8 @@ type childInfo struct {
 func (a *API) manifest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	q := r.URL.Query()
-	repo, err := a.DB.RepoByName(ctx, q.Get("repo"))
-	if err == nil && !a.canRead(w, r, repo) {
-		return
-	}
-	if err != nil {
-		a.fail(w, r, err)
+	repo, ok := a.readableRepo(w, r, q.Get("repo"))
+	if !ok {
 		return
 	}
 	ref := q.Get("ref")

@@ -44,6 +44,10 @@ type API struct {
 	Log    *slog.Logger
 	// Registry serves the imports' pushes in-process; nil disables import.
 	Registry *registry.Handler
+	// PublicBrowse lets visitors without a session list and inspect public
+	// repositories. Off by default: unlike anonymous pulls, it reveals which
+	// repository names exist.
+	PublicBrowse bool
 
 	images  *imageCache
 	imports imports
@@ -66,11 +70,11 @@ func New(db *meta.DB, store *storage.FS, a *auth.Authenticator, collector *gc.Co
 	m.HandleFunc("GET /api/me", api.user(api.me))
 
 	m.HandleFunc("GET /api/stats", api.user(api.stats))
-	m.HandleFunc("GET /api/repos", api.user(api.repos))
-	m.HandleFunc("GET /api/repo", api.user(api.repo))
+	m.HandleFunc("GET /api/repos", api.optional(api.repos))
+	m.HandleFunc("GET /api/repo", api.optional(api.repo))
 	m.HandleFunc("PATCH /api/repo", api.user(api.updateRepo))
 	m.HandleFunc("DELETE /api/repo", api.user(api.deleteRepo))
-	m.HandleFunc("GET /api/manifest", api.user(api.manifest))
+	m.HandleFunc("GET /api/manifest", api.optional(api.manifest))
 	m.HandleFunc("DELETE /api/manifest", api.user(api.deleteManifest))
 	m.HandleFunc("DELETE /api/tag", api.user(api.deleteTag))
 
@@ -154,6 +158,14 @@ type ctxKey struct{}
 
 func currentUser(r *http.Request) meta.User { return r.Context().Value(ctxKey{}).(meta.User) }
 
+// principal is the signed-in user, or auth.Anonymous on optional routes.
+func principal(r *http.Request) auth.Principal {
+	if u, ok := r.Context().Value(ctxKey{}).(meta.User); ok {
+		return auth.Principal{User: &u}
+	}
+	return auth.Anonymous
+}
+
 func (a *API) authenticate(r *http.Request) (meta.User, bool) {
 	c, err := r.Cookie(sessionCookie)
 	if err != nil {
@@ -180,6 +192,22 @@ func (a *API) guard(check func(meta.User) bool, next http.HandlerFunc) http.Hand
 
 func (a *API) user(next http.HandlerFunc) http.HandlerFunc {
 	return a.guard(func(meta.User) bool { return true }, next)
+}
+
+// optional admits visitors without a session when PublicBrowse is on; the
+// handler then sees auth.Anonymous and Can only grants public content.
+func (a *API) optional(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if u, ok := a.authenticate(r); ok {
+			next(w, r.WithContext(context.WithValue(r.Context(), ctxKey{}, u)))
+			return
+		}
+		if !a.PublicBrowse {
+			writeErr(w, http.StatusUnauthorized, "not logged in")
+			return
+		}
+		next(w, r)
+	}
 }
 
 func (a *API) admin(next http.HandlerFunc) http.HandlerFunc {
@@ -312,16 +340,25 @@ func (a *API) record(r *http.Request, action, project, resource, detail string) 
 
 // allow checks a project permission for the current user and writes 403 if denied.
 func (a *API) allow(w http.ResponseWriter, r *http.Request, project string, action auth.Action) bool {
-	u := currentUser(r)
-	ok, err := a.Auth.Can(r.Context(), auth.Principal{User: &u}, project, action)
+	p := principal(r)
+	ok, err := a.Auth.Can(r.Context(), p, project, action)
 	if err != nil {
 		a.fail(w, r, err)
 		return false
 	}
 	if !ok {
-		writeErr(w, http.StatusForbidden, "permission denied")
+		denied(w, p)
 	}
 	return ok
+}
+
+// denied answers 401 to visitors, so the UI offers a login, and 403 to users.
+func denied(w http.ResponseWriter, p auth.Principal) {
+	if p.Kind() == "anonymous" {
+		writeErr(w, http.StatusUnauthorized, "not logged in")
+		return
+	}
+	writeErr(w, http.StatusForbidden, "permission denied")
 }
 
 func (a *API) logout(w http.ResponseWriter, r *http.Request) {
