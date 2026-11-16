@@ -420,3 +420,25 @@ func noLimit(n int) int64 {
 	}
 	return int64(n)
 }
+
+// RepoReadme returns a repository's Markdown README ("" when none is set).
+func (db *DB) RepoReadme(ctx context.Context, repoID int64) (string, error) {
+	var s string
+	err := db.R.QueryRowContext(ctx, `SELECT readme FROM repositories WHERE id = ?`, repoID).Scan(&s)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return s, err
+}
+
+// SetRepoReadme replaces a repository's README.
+func (db *DB) SetRepoReadme(ctx context.Context, name, readme string) error {
+	res, err := db.W.ExecContext(ctx, `UPDATE repositories SET readme = ? WHERE name = ?`, readme, name)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

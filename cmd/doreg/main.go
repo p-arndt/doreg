@@ -154,6 +154,7 @@ func serve(args []string) error {
 	apiHandler := api.New(a.db, a.store, authn, collector, bus, provider, a.log)
 	apiHandler.Registry = reg
 	apiHandler.PublicBrowse = os.Getenv("DOREG_PUBLIC_BROWSE") == "true"
+	apiHandler.GitHubToken = os.Getenv("DOREG_GITHUB_TOKEN")
 	mux.Handle("/api/", apiHandler)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	mux.Handle("/", webui.Handler())

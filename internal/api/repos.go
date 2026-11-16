@@ -211,11 +211,15 @@ type repoListItem struct {
 	Size      int64  `json:"size"`
 	LastPush  int64  `json:"lastPush"`
 	CreatedAt int64  `json:"createdAt"`
+	// Description comes from the image labels of the newest tag.
+	Description string `json:"description,omitempty"`
+
+	id int64
 }
 
 func (a *API) repos(w http.ResponseWriter, r *http.Request) {
 	rows, err := a.DB.R.QueryContext(r.Context(), `
-		SELECT r.name, r.public, r.created_at,
+		SELECT r.id, r.name, r.public, r.created_at,
 			(SELECT count(*) FROM tags t WHERE t.repo_id = r.id),
 			(SELECT count(*) FROM manifests m WHERE m.repo_id = r.id),
 			(SELECT CAST(coalesce(sum(b.size), 0) AS BIGINT) FROM repo_blobs rb JOIN blobs b ON b.digest = rb.digest WHERE rb.repo_id = r.id),
@@ -232,7 +236,7 @@ func (a *API) repos(w http.ResponseWriter, r *http.Request) {
 	out := []repoListItem{}
 	for rows.Next() {
 		var it repoListItem
-		if err := rows.Scan(&it.Name, &it.Public, &it.CreatedAt, &it.Tags, &it.Manifests, &it.Size, &it.LastPush); err != nil {
+		if err := rows.Scan(&it.id, &it.Name, &it.Public, &it.CreatedAt, &it.Tags, &it.Manifests, &it.Size, &it.LastPush); err != nil {
 			a.fail(w, r, err)
 			return
 		}
@@ -245,6 +249,11 @@ func (a *API) repos(w http.ResponseWriter, r *http.Request) {
 		if (visible || it.Public) && (project == "" || project == it.Project) {
 			out = append(out, it)
 		}
+	}
+	rows.Close()
+	// Labels are read only for the rows the caller gets back.
+	for i := range out {
+		out[i].Description, _ = a.repoLabels(r.Context(), out[i].id)
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -349,13 +358,24 @@ func (a *API) repo(w http.ResponseWriter, r *http.Request) {
 		SELECT CAST(coalesce(sum(b.size), 0) AS BIGINT) FROM repo_blobs rb JOIN blobs b ON b.digest = rb.digest WHERE rb.repo_id = ?`,
 		repo.ID).Scan(&size)
 
+	readme, err := a.DB.RepoReadme(ctx, repo.ID)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	description, source := a.repoLabels(ctx, repo.ID)
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"name":      repo.Name,
-		"public":    repo.Public,
-		"createdAt": repo.CreatedAt,
-		"size":      size,
-		"tags":      tags,
-		"untagged":  untagged,
+		"name":        repo.Name,
+		"public":      repo.Public,
+		"createdAt":   repo.CreatedAt,
+		"size":        size,
+		"description": description,
+		"source":      source,
+		"readme":      readme,
+		"readmeHtml":  renderMarkdown(readme),
+		"tags":        tags,
+		"untagged":    untagged,
 	})
 }
 

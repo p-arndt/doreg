@@ -48,6 +48,10 @@ type API struct {
 	// repositories. Off by default: unlike anonymous pulls, it reveals which
 	// repository names exist.
 	PublicBrowse bool
+	// GitHubAPI is the base URL README imports fetch from; GitHubToken, when
+	// set, lifts the anonymous rate limit and reaches private repositories.
+	GitHubAPI   string
+	GitHubToken string
 
 	images  *imageCache
 	imports imports
@@ -58,7 +62,7 @@ type API struct {
 func New(db *meta.DB, store *storage.FS, a *auth.Authenticator, collector *gc.Collector, bus *events.Bus,
 	provider *oidc.Provider, log *slog.Logger) *API {
 	api := &API{DB: db, Store: store, Auth: a, GC: collector, Events: bus, OIDC: provider, Log: log,
-		images: newImageCache(), mux: http.NewServeMux()}
+		images: newImageCache(), mux: http.NewServeMux(), GitHubAPI: "https://api.github.com"}
 	m := api.mux
 	m.HandleFunc("GET /api/auth/config", api.authConfig)
 	m.HandleFunc("GET /api/auth/oidc/login", api.oidcLogin)
@@ -74,6 +78,9 @@ func New(db *meta.DB, store *storage.FS, a *auth.Authenticator, collector *gc.Co
 	m.HandleFunc("GET /api/repo", api.optional(api.repo))
 	m.HandleFunc("PATCH /api/repo", api.user(api.updateRepo))
 	m.HandleFunc("DELETE /api/repo", api.user(api.deleteRepo))
+	m.HandleFunc("PUT /api/repo/readme", api.user(api.saveReadme))
+	m.HandleFunc("POST /api/repo/readme/preview", api.user(api.previewReadme))
+	m.HandleFunc("POST /api/repo/readme/github", api.user(api.importGitHubReadme))
 	m.HandleFunc("GET /api/manifest", api.optional(api.manifest))
 	m.HandleFunc("DELETE /api/manifest", api.user(api.deleteManifest))
 	m.HandleFunc("DELETE /api/tag", api.user(api.deleteTag))
