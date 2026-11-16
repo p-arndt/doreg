@@ -134,7 +134,9 @@ Deliveries are `POST` requests with a JSON body and these headers:
 - `X-Doreg-Attempt`: 1 for the first try, then 2 and 3.
 - `X-Doreg-Signature-256`: `sha256=<hex>`, the HMAC-SHA256 of the body with the webhook secret. Sent only when a secret is set.
 
-A delivery fails on a network error or any status other than 2xx. It is retried after 5 and 30 seconds, then dropped.
+A delivery fails on a network error or any status other than 2xx. It is retried after 5 and 30 seconds, then dropped. Redirects are not followed.
+
+Webhook URLs that resolve to loopback, private, link-local or CGNAT addresses are refused, so project admins cannot reach internal services. Set `DOREG_WEBHOOK_ALLOW_PRIVATE=true` if your receivers live on the internal network.
 
 Example body for a push (`occurredAt` is a Unix timestamp; `operatorKind` is `user`, `robot` or `anonymous`):
 

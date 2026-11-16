@@ -76,6 +76,7 @@ func apitNewEnv(t *testing.T) *apitEnv {
 	authn := auth.New(db)
 	collector := gc.New(db, store, logger)
 	bus := events.New(db, logger)
+	bus.AllowPrivate = true // webhook receivers in these tests listen on 127.0.0.1
 	handler := api.New(db, store, authn, collector, bus, nil, logger)
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)

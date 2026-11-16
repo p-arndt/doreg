@@ -8,11 +8,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
+	"os"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/p-arndt/doreg/internal/meta"
@@ -67,6 +72,66 @@ type Bus struct {
 	queue  chan delivery
 	// Retry delays between attempts; tests shorten them.
 	Backoff []time.Duration
+	// AllowPrivate permits deliveries to loopback, private, link-local and
+	// similar internal addresses. Off by default so project admins cannot use
+	// webhooks to reach services inside the operator's network. Set from
+	// DOREG_WEBHOOK_ALLOW_PRIVATE.
+	AllowPrivate bool
+}
+
+// ErrDestinationNotAllowed is the dial error for a webhook destination that
+// resolves to an internal address while AllowPrivate is off.
+var ErrDestinationNotAllowed = errors.New("destination address is not allowed")
+
+// blockedPrefixes are ranges not covered by the netip predicates in
+// destinationAllowed.
+var blockedPrefixes = []netip.Prefix{
+	netip.MustParsePrefix("0.0.0.0/8"),     // "this network"; 0.x reaches the local host on Linux
+	netip.MustParsePrefix("100.64.0.0/10"), // CGNAT, often used for internal overlays
+}
+
+func destinationAllowed(a netip.Addr) bool {
+	a = a.Unmap()
+	if !a.IsValid() || a.IsLoopback() || a.IsPrivate() || a.IsUnspecified() ||
+		a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast() || a.IsInterfaceLocalMulticast() || a.IsMulticast() {
+		return false
+	}
+	for _, p := range blockedPrefixes {
+		if p.Contains(a) {
+			return false
+		}
+	}
+	return true
+}
+
+// newClient checks the destination at dial time, after DNS resolution, so
+// neither DNS rebinding nor a hostname pointing inward can bypass it.
+func (b *Bus) newClient() *http.Client {
+	dialer := &net.Dialer{
+		Timeout: 5 * time.Second,
+		Control: func(_, address string, _ syscall.RawConn) error {
+			if b.AllowPrivate {
+				return nil
+			}
+			ap, err := netip.ParseAddrPort(address)
+			if err != nil || !destinationAllowed(ap.Addr()) {
+				return ErrDestinationNotAllowed
+			}
+			return nil
+		},
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	// An environment proxy would make the dial check see the proxy's address
+	// instead of the webhook's.
+	transport.Proxy = nil
+	transport.DialContext = dialer.DialContext
+	return &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: transport,
+		// A redirect could point inward or to another host than the one the
+		// admin configured; treat it as a failed delivery.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 }
 
 type delivery struct {
@@ -79,12 +144,13 @@ type delivery struct {
 // New starts a bus with background delivery workers.
 func New(db *meta.DB, log *slog.Logger) *Bus {
 	b := &Bus{
-		db:      db,
-		log:     log,
-		client:  &http.Client{Timeout: 10 * time.Second},
-		queue:   make(chan delivery, 1000),
-		Backoff: []time.Duration{5 * time.Second, 30 * time.Second},
+		db:           db,
+		log:          log,
+		queue:        make(chan delivery, 1000),
+		Backoff:      []time.Duration{5 * time.Second, 30 * time.Second},
+		AllowPrivate: os.Getenv("DOREG_WEBHOOK_ALLOW_PRIVATE") == "true",
 	}
+	b.client = b.newClient()
 	for range 2 {
 		go b.worker()
 	}
@@ -192,7 +258,10 @@ func (b *Bus) send(ctx context.Context, h meta.Webhook, event string, body []byt
 			}
 		}
 	}
-	if err != nil {
+	switch {
+	case errors.Is(err, ErrDestinationNotAllowed):
+		res.Error = ErrDestinationNotAllowed.Error()
+	case err != nil:
 		res.Error = err.Error()
 	}
 	res.DurationMs = time.Since(start).Milliseconds()

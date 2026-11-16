@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -86,6 +87,8 @@ func setup(t *testing.T) (*meta.DB, *events.Bus) {
 	t.Cleanup(func() { db.Close() })
 	bus := events.New(db, slog.New(slog.DiscardHandler))
 	bus.Backoff = []time.Duration{time.Millisecond, time.Millisecond}
+	// The receivers are httptest servers on 127.0.0.1.
+	bus.AllowPrivate = true
 	return db, bus
 }
 
@@ -236,5 +239,93 @@ func TestEmitWritesAuditRow(t *testing.T) {
 	if r.Action != events.DeleteTag || r.Actor != "alice" || r.Project != "app" ||
 		r.Resource != "app/api:1.0" || r.Detail != "manual" || r.At == 0 {
 		t.Errorf("unexpected audit row: %+v", r)
+	}
+}
+
+func TestLoopbackDestinationRefusedByDefault(t *testing.T) {
+	db, bus := setup(t)
+	bus.AllowPrivate = false
+	rcv := newReceiver(t)
+	ctx := context.Background()
+	id := addHook(t, db, meta.Webhook{Name: "internal", URL: rcv.srv.URL + "/internal", Events: []string{events.Push}, Enabled: true})
+
+	d := bus.Test(ctx, meta.Webhook{ID: id, URL: rcv.srv.URL + "/internal"}, "alice")
+	if d.Error != events.ErrDestinationNotAllowed.Error() {
+		t.Errorf("error = %q, want %q", d.Error, events.ErrDestinationNotAllowed.Error())
+	}
+	if d.StatusCode != 0 {
+		t.Errorf("status = %d, want 0", d.StatusCode)
+	}
+	if n := rcv.count("/internal"); n != 0 {
+		t.Errorf("receiver got %d requests, want 0", n)
+	}
+	ds, err := db.Deliveries(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ds) != 1 || ds[0].Error != events.ErrDestinationNotAllowed.Error() {
+		t.Errorf("deliveries = %+v, want one refused delivery", ds)
+	}
+}
+
+func TestHostnameResolvingToLoopbackRefused(t *testing.T) {
+	_, bus := setup(t)
+	bus.AllowPrivate = false
+	rcv := newReceiver(t)
+	_, port, _ := net.SplitHostPort(rcv.srv.Listener.Addr().String())
+
+	d := bus.Test(context.Background(), meta.Webhook{URL: "http://localhost:" + port + "/internal"}, "alice")
+	if d.Error != events.ErrDestinationNotAllowed.Error() {
+		t.Errorf("error = %q, want %q", d.Error, events.ErrDestinationNotAllowed.Error())
+	}
+	if n := rcv.count("/internal"); n != 0 {
+		t.Errorf("receiver got %d requests, want 0", n)
+	}
+}
+
+func TestRedirectNotFollowed(t *testing.T) {
+	_, bus := setup(t)
+	rcv := newReceiver(t)
+	redirector := httptest.NewServer(http.RedirectHandler(rcv.srv.URL+"/target", http.StatusFound))
+	t.Cleanup(redirector.Close)
+
+	d := bus.Test(context.Background(), meta.Webhook{URL: redirector.URL}, "alice")
+	if d.StatusCode != http.StatusFound {
+		t.Errorf("status = %d, want 302", d.StatusCode)
+	}
+	if d.Error == "" {
+		t.Error("redirect recorded as a successful delivery")
+	}
+	if n := rcv.count("/target"); n != 0 {
+		t.Errorf("redirect target got %d requests, want 0", n)
+	}
+}
+
+func TestAllowPrivateDeliversToLoopback(t *testing.T) {
+	_, bus := setup(t)
+	rcv := newReceiver(t)
+
+	d := bus.Test(context.Background(), meta.Webhook{URL: rcv.srv.URL + "/internal"}, "alice")
+	if d.Error != "" || d.StatusCode != http.StatusOK {
+		t.Errorf("delivery = status %d error %q, want 200", d.StatusCode, d.Error)
+	}
+	if n := rcv.count("/internal"); n != 1 {
+		t.Errorf("receiver got %d requests, want 1", n)
+	}
+}
+
+func TestAllowPrivateReadFromEnvironment(t *testing.T) {
+	db, err := meta.Open(t.TempDir() + "/doreg.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	t.Setenv("DOREG_WEBHOOK_ALLOW_PRIVATE", "true")
+	if !events.New(db, slog.New(slog.DiscardHandler)).AllowPrivate {
+		t.Error("AllowPrivate is false with DOREG_WEBHOOK_ALLOW_PRIVATE=true")
+	}
+	t.Setenv("DOREG_WEBHOOK_ALLOW_PRIVATE", "")
+	if events.New(db, slog.New(slog.DiscardHandler)).AllowPrivate {
+		t.Error("AllowPrivate is true without DOREG_WEBHOOK_ALLOW_PRIVATE")
 	}
 }
