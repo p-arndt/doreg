@@ -20,6 +20,7 @@ import (
 	"github.com/p-arndt/doreg/internal/events"
 	"github.com/p-arndt/doreg/internal/gc"
 	"github.com/p-arndt/doreg/internal/meta"
+	"github.com/p-arndt/doreg/internal/registry"
 	"github.com/p-arndt/doreg/internal/storage"
 )
 
@@ -78,6 +79,7 @@ func apitNewEnv(t *testing.T) *apitEnv {
 	bus := events.New(db, logger)
 	bus.AllowPrivate = true // webhook receivers in these tests listen on 127.0.0.1
 	handler := api.New(db, store, authn, collector, bus, nil, logger)
+	handler.Registry = &registry.Handler{DB: db, Store: store, Auth: authn, Events: bus, Log: logger}
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 

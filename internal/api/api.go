@@ -21,6 +21,7 @@ import (
 	"github.com/p-arndt/doreg/internal/gc"
 	"github.com/p-arndt/doreg/internal/meta"
 	"github.com/p-arndt/doreg/internal/oidc"
+	"github.com/p-arndt/doreg/internal/registry"
 	"github.com/p-arndt/doreg/internal/storage"
 )
 
@@ -41,9 +42,12 @@ type API struct {
 	Events *events.Bus
 	OIDC   *oidc.Provider // nil when SSO is not configured
 	Log    *slog.Logger
+	// Registry serves the imports' pushes in-process; nil disables import.
+	Registry *registry.Handler
 
-	images *imageCache
-	mux    *http.ServeMux
+	images  *imageCache
+	imports imports
+	mux     *http.ServeMux
 }
 
 // New wires the routes.
@@ -104,6 +108,11 @@ func New(db *meta.DB, store *storage.FS, a *auth.Authenticator, collector *gc.Co
 	m.HandleFunc("PUT /api/policies/{id}", api.admin(api.savePolicy))
 	m.HandleFunc("DELETE /api/policies/{id}", api.admin(api.deletePolicy))
 	m.HandleFunc("POST /api/policies/preview", api.admin(api.previewPolicies))
+
+	m.HandleFunc("GET /api/import", api.admin(api.importStatus))
+	m.HandleFunc("POST /api/import", api.admin(api.importStart))
+	m.HandleFunc("POST /api/import/preview", api.admin(api.importPreview))
+	m.HandleFunc("POST /api/import/cancel", api.admin(api.importCancel))
 
 	m.HandleFunc("GET /api/users", api.admin(api.users))
 	m.HandleFunc("POST /api/users", api.admin(api.createUser))

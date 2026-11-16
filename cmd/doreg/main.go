@@ -142,9 +142,12 @@ func serve(args []string) error {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/v2/", &registry.Handler{DB: a.db, Store: a.store, Auth: authn, Events: bus, Log: a.log})
+	reg := &registry.Handler{DB: a.db, Store: a.store, Auth: authn, Events: bus, Log: a.log}
+	mux.Handle("/v2/", reg)
 	mux.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
-	mux.Handle("/api/", api.New(a.db, a.store, authn, collector, bus, provider, a.log))
+	apiHandler := api.New(a.db, a.store, authn, collector, bus, provider, a.log)
+	apiHandler.Registry = reg
+	mux.Handle("/api/", apiHandler)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	mux.Handle("/", webui.Handler())
 
