@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -105,6 +106,19 @@ func HashPassword(pw string) (string, error) {
 	return string(h), err
 }
 
+// TokenPrefix marks tokens issued by `doreg login`, so Basic auth can look
+// them up by hash instead of trying bcrypt.
+const TokenPrefix = "doreg_"
+
+// NewToken returns a random `doreg login` token.
+func NewToken() string { return TokenPrefix + NewSecret() }
+
+// HashToken is the lookup key stored for a token.
+func HashToken(t string) string {
+	sum := sha256.Sum256([]byte(t))
+	return hex.EncodeToString(sum[:])
+}
+
 // NewSecret returns a random secret for robots and CLI logins.
 func NewSecret() string {
 	b := make([]byte, 24)
@@ -169,7 +183,13 @@ func (a *Authenticator) Basic(ctx context.Context, username, secret string) (Pri
 			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(secret))
 			return Anonymous, false
 		}
-		if !matches(u.PasswordHash, secret) && !matches(u.CLISecret, secret) {
+		if strings.HasPrefix(secret, TokenPrefix) {
+			t, err := a.db.CLITokenByHash(ctx, HashToken(secret))
+			if err != nil || t.UserID != u.ID {
+				return Anonymous, false
+			}
+			a.db.TouchCLIToken(ctx, t)
+		} else if !matches(u.PasswordHash, secret) && !matches(u.CLISecret, secret) {
 			return Anonymous, false
 		}
 		p.User = &u
