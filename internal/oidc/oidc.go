@@ -28,7 +28,8 @@ type Config struct {
 	Scopes        []string // default: openid, profile, email
 	UsernameClaim string   // default preferred_username
 	GroupsClaim   string   // empty: merge "groups", "roles" and Keycloak's realm_access.roles
-	AdminRole     string   // users with this group/role become system admins; empty leaves roles alone
+	AdminRole     string   // users with this group/role become system admins
+	AdminEmails   []string // users with one of these verified emails become system admins
 }
 
 // ConfigFromEnv reads the configuration. It returns nil when OIDC is not configured.
@@ -47,6 +48,9 @@ func ConfigFromEnv() (*Config, error) {
 		UsernameClaim: envOr("OIDC_USERNAME_CLAIM", "preferred_username"),
 		GroupsClaim:   os.Getenv("OIDC_GROUPS_CLAIM"),
 		AdminRole:     os.Getenv("OIDC_ADMIN_ROLE"),
+	}
+	for _, e := range splitList(os.Getenv("OIDC_ADMIN_EMAILS")) {
+		c.AdminEmails = append(c.AdminEmails, strings.ToLower(e))
 	}
 	if c.ClientID == "" || c.ClientSecret == "" || c.RedirectURI == "" {
 		return nil, errors.New("OIDC_ISSUER needs OIDC_CLIENT_ID, OIDC_CLIENT_SECRET and OIDC_REDIRECT_URI (<public url>/api/auth/oidc/callback)")
@@ -68,10 +72,11 @@ func envOr(k, def string) string {
 
 // Identity is what doreg takes from a verified ID token.
 type Identity struct {
-	Subject  string // issuer|sub, stable across username changes
-	Username string
-	Email    string
-	Groups   []string
+	Subject       string // issuer|sub, stable across username changes
+	Username      string
+	Email         string
+	EmailVerified bool
+	Groups        []string
 }
 
 // Provider runs the login flow.
@@ -114,8 +119,32 @@ func New(ctx context.Context, cfg Config) (*Provider, error) {
 // Name is the label for the login button.
 func (p *Provider) Name() string { return p.cfg.ProviderName }
 
-// AdminRole returns the group or role that grants system admin.
-func (p *Provider) AdminRole() string { return p.cfg.AdminRole }
+// AdminRule decides whether id is a system admin. configured is false when
+// neither OIDC_ADMIN_ROLE nor OIDC_ADMIN_EMAILS is set; then doreg keeps roles
+// as they are (and makes the first SSO user admin while there is none).
+func (p *Provider) AdminRule(id Identity) (configured, admin bool) {
+	return p.cfg.adminRule(id)
+}
+
+func (c Config) adminRule(id Identity) (configured, admin bool) {
+	if c.AdminRole == "" && len(c.AdminEmails) == 0 {
+		return false, false
+	}
+	for _, g := range id.Groups {
+		if c.AdminRole != "" && g == c.AdminRole {
+			return true, true
+		}
+	}
+	// An unverified address could be anyone's; it never grants admin.
+	if id.EmailVerified && id.Email != "" {
+		for _, e := range c.AdminEmails {
+			if strings.EqualFold(e, id.Email) {
+				return true, true
+			}
+		}
+	}
+	return true, false
+}
 
 func random() string {
 	b := make([]byte, 24)
@@ -174,6 +203,12 @@ func (p *Provider) Finish(ctx context.Context, state, cookieState, code string) 
 	id := Identity{Subject: idt.Issuer + "|" + idt.Subject}
 	id.Username, _ = claims[p.cfg.UsernameClaim].(string)
 	id.Email, _ = claims["email"].(string)
+	switch v := claims["email_verified"].(type) {
+	case bool:
+		id.EmailVerified = v
+	case string: // some providers send "true"
+		id.EmailVerified = v == "true"
+	}
 	if id.Username == "" {
 		id.Username, _, _ = strings.Cut(id.Email, "@")
 	}

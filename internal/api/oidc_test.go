@@ -147,6 +147,7 @@ func (f *fakeIdP) setUser(sub, username, email string, groups ...string) {
 		"sub":                sub,
 		"preferred_username": username,
 		"email":              email,
+		"email_verified":     true,
 		"groups":             groups,
 	}
 }
@@ -161,6 +162,12 @@ type oidcEnv struct {
 }
 
 func newOIDCEnv(t *testing.T, adminGroup string) *oidcEnv {
+	t.Helper()
+	return newOIDCEnvCfg(t, func(c *oidc.Config) { c.AdminRole = adminGroup })
+}
+
+// newOIDCEnvCfg lets a test adjust the provider configuration.
+func newOIDCEnvCfg(t *testing.T, configure func(*oidc.Config)) *oidcEnv {
 	t.Helper()
 	ctx := t.Context()
 	idp := newFakeIdP(t)
@@ -183,7 +190,7 @@ func newOIDCEnv(t *testing.T, adminGroup string) *oidcEnv {
 	// OIDC provider is configured.
 	srv := httptest.NewUnstartedServer(nil)
 	base := "http://" + srv.Listener.Addr().String()
-	provider, err := oidc.New(ctx, oidc.Config{
+	cfg := oidc.Config{
 		Issuer:        idp.srv.URL,
 		ClientID:      oidcTestClientID,
 		ClientSecret:  "s",
@@ -191,9 +198,9 @@ func newOIDCEnv(t *testing.T, adminGroup string) *oidcEnv {
 		RedirectURI:   base + "/api/auth/oidc/callback",
 		Scopes:        []string{"openid", "profile", "email", "groups"},
 		UsernameClaim: "preferred_username",
-
-		AdminRole: adminGroup,
-	})
+	}
+	configure(&cfg)
+	provider, err := oidc.New(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,6 +303,10 @@ func (e *oidcEnv) me(t *testing.T, c *http.Client) (username, role string, group
 
 func TestOIDCFirstLoginCreatesUser(t *testing.T) {
 	e := newOIDCEnv(t, "")
+	// An existing admin keeps the first-SSO-user rule from promoting alice.
+	if err := e.db.UpsertUser(t.Context(), "root", "", meta.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
 	e.idp.setUser("sub-alice", "alice", "alice@example.com", "dev", "ops")
 
 	resp := e.login(t, "/projects/demo")
@@ -336,17 +347,6 @@ func TestOIDCFirstLoginCreatesUser(t *testing.T) {
 	}
 }
 
-func TestOIDCAdminGroupTogglesRole(t *testing.T) {
-	e := newOIDCEnv(t, "admins")
-	e.idp.setUser("sub-bob", "bob", "bob@example.com", "admins")
-	if resp := e.login(t, "/"); resp.StatusCode != http.StatusFound {
-		t.Fatalf("first login: status %d, want 302", resp.StatusCode)
-	}
-	if _, role, _ := e.me(t, e.client); role != meta.RoleAdmin {
-		t.Fatalf("member of admin group: role = %q, want %q", role, meta.RoleAdmin)
-	}
-
-	e.idp.setUser("sub-bob", "bob", "bob@example.com", "dev")
 func TestOIDCSessionIsShortLived(t *testing.T) {
 	e := newOIDCEnv(t, "")
 	e.idp.setUser("sub-1", "alice", "alice@example.com")
@@ -360,6 +360,17 @@ func TestOIDCSessionIsShortLived(t *testing.T) {
 	}
 }
 
+func TestOIDCAdminGroupTogglesRole(t *testing.T) {
+	e := newOIDCEnv(t, "admins")
+	e.idp.setUser("sub-bob", "bob", "bob@example.com", "admins")
+	if resp := e.login(t, "/"); resp.StatusCode != http.StatusFound {
+		t.Fatalf("first login: status %d, want 302", resp.StatusCode)
+	}
+	if _, role, _ := e.me(t, e.client); role != meta.RoleAdmin {
+		t.Fatalf("member of admin group: role = %q, want %q", role, meta.RoleAdmin)
+	}
+
+	e.idp.setUser("sub-bob", "bob", "bob@example.com", "dev")
 	if resp := e.login(t, "/"); resp.StatusCode != http.StatusFound {
 		t.Fatalf("second login: status %d, want 302", resp.StatusCode)
 	}

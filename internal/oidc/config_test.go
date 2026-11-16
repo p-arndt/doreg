@@ -46,3 +46,41 @@ func TestStringList(t *testing.T) {
 		t.Errorf("got %v", got)
 	}
 }
+
+func TestAdminRule(t *testing.T) {
+	none := Config{}
+	if configured, _ := none.adminRule(Identity{Groups: []string{"x"}}); configured {
+		t.Error("empty config reported as configured")
+	}
+	c := Config{AdminRole: "registry-admin", AdminEmails: []string{"boss@example.com"}}
+	cases := []struct {
+		name string
+		id   Identity
+		want bool
+	}{
+		{"role", Identity{Groups: []string{"dev", "registry-admin"}}, true},
+		{"verified email", Identity{Email: "BOSS@example.com", EmailVerified: true}, true},
+		{"unverified email", Identity{Email: "boss@example.com"}, false},
+		{"other", Identity{Email: "x@example.com", EmailVerified: true, Groups: []string{"dev"}}, false},
+	}
+	for _, tc := range cases {
+		if configured, admin := c.adminRule(tc.id); !configured || admin != tc.want {
+			t.Errorf("%s: admin = %v, want %v", tc.name, admin, tc.want)
+		}
+	}
+}
+
+func TestConfigAdminEmails(t *testing.T) {
+	t.Setenv("OIDC_ISSUER", "http://issuer")
+	t.Setenv("OIDC_CLIENT_ID", "doreg")
+	t.Setenv("OIDC_CLIENT_SECRET", "s")
+	t.Setenv("OIDC_REDIRECT_URI", "http://localhost:5000/api/auth/oidc/callback")
+	t.Setenv("OIDC_ADMIN_EMAILS", "A@example.com, b@example.com")
+	c, err := ConfigFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(c.AdminEmails, []string{"a@example.com", "b@example.com"}) {
+		t.Errorf("admin emails = %v", c.AdminEmails)
+	}
+}

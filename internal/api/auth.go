@@ -9,6 +9,7 @@ import (
 
 	"github.com/p-arndt/doreg/internal/auth"
 	"github.com/p-arndt/doreg/internal/meta"
+	"github.com/p-arndt/doreg/internal/oidc"
 )
 
 const oidcStateCookie = "doreg_oidc_state"
@@ -66,7 +67,7 @@ func (a *API) oidcCallback(w http.ResponseWriter, r *http.Request) {
 		loginError(err.Error())
 		return
 	}
-	u, err := a.provisionOIDCUser(r, id.Subject, id.Username, id.Email, id.Groups)
+	u, err := a.provisionOIDCUser(r, id)
 	if err != nil {
 		a.Log.Error("oidc provisioning failed", "err", err)
 		loginError("could not create your account")
@@ -82,22 +83,22 @@ func (a *API) oidcCallback(w http.ResponseWriter, r *http.Request) {
 // provisionOIDCUser finds or creates the account for an SSO identity. An
 // existing local account with the same name is never taken over: the SSO user
 // gets a suffixed name instead.
-func (a *API) provisionOIDCUser(r *http.Request, subject, username, email string, groups []string) (meta.User, error) {
+//
+// Admin rights come from OIDC_ADMIN_ROLE / OIDC_ADMIN_EMAILS when either is
+// set, on every login (so revoking at the provider demotes). Without them,
+// roles stay as they are, and the first SSO user becomes admin while the
+// instance has no admin at all, so a fresh SSO-only install needs no password.
+func (a *API) provisionOIDCUser(r *http.Request, id oidc.Identity) (meta.User, error) {
 	ctx := r.Context()
+	subject, username, email, groups := id.Subject, id.Username, id.Email, id.Groups
+	configured, isAdmin := a.OIDC.AdminRule(id)
 	role := meta.RoleUser
-	adminGroup := a.OIDC.AdminRole()
-	isAdmin := false
-	for _, g := range groups {
-		if g == adminGroup && adminGroup != "" {
-			isAdmin = true
-		}
-	}
 	if isAdmin {
 		role = meta.RoleAdmin
 	}
 	u, err := a.DB.UserByOIDCSubject(ctx, subject)
 	if err == nil {
-		if adminGroup == "" {
+		if !configured {
 			role = u.Role
 		}
 		if err := a.DB.UpdateOIDCLogin(ctx, u.ID, email, role, groups); err != nil {
@@ -109,6 +110,16 @@ func (a *API) provisionOIDCUser(r *http.Request, subject, username, email string
 	if !errors.Is(err, meta.ErrNotFound) {
 		return u, err
 	}
+	firstAdmin := false
+	if !configured {
+		n, err := a.DB.CountAdmins(ctx)
+		if err != nil {
+			return u, err
+		}
+		if n == 0 {
+			role, firstAdmin = meta.RoleAdmin, true
+		}
+	}
 	name := sanitizeUsername(username)
 	for i := 2; ; i++ {
 		if _, err := a.DB.UserByName(ctx, name); errors.Is(err, meta.ErrNotFound) {
@@ -118,7 +129,12 @@ func (a *API) provisionOIDCUser(r *http.Request, subject, username, email string
 	}
 	u, err = a.DB.CreateOIDCUser(ctx, meta.User{Username: name, Role: role, Email: email, OIDCSubject: subject, Groups: groups})
 	if err == nil {
-		a.Events.Audit(ctx, name, "user", "user_create", "", name, "first sign-in via SSO", clientIP(r))
+		detail := "first sign-in via SSO"
+		if firstAdmin {
+			detail = "first sign-in via SSO; made admin because the instance had no admin"
+			a.Log.Warn("first SSO user became system admin; set OIDC_ADMIN_ROLE or OIDC_ADMIN_EMAILS to control this", "user", name)
+		}
+		a.Events.Audit(ctx, name, "user", "user_create", "", name, detail, clientIP(r))
 	}
 	return u, err
 }

@@ -216,3 +216,10 @@ func (db *DB) DeleteUserSessionsExcept(ctx context.Context, userID int64, keepTo
 	_, err := db.W.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?`, userID, hashToken(keepToken))
 	return err
 }
+
+// CountAdmins returns the number of system administrators.
+func (db *DB) CountAdmins(ctx context.Context) (int, error) {
+	var n int
+	err := db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE role = 'admin'`).Scan(&n)
+	return n, err
+}
