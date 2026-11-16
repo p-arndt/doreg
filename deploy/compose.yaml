@@ -1,6 +1,9 @@
 # Example deployment behind Traefik. Layer pushes can take minutes: raise the
 # entrypoint's readTimeout (Traefik v3 defaults to 60s), e.g.
 #   --entrypoints.websecure.transport.respondingTimeouts.readTimeout=0
+# Fixed project name, so the volume is doreg_doreg-data regardless of the directory.
+name: doreg
+
 services:
   doreg:
     image: ghcr.io/p-arndt/doreg:latest
@@ -21,15 +24,7 @@ services:
       # Members of this group or role become system admins.
       # OIDC_ADMIN_ROLE: doreg-admins
       # OIDC_ADMIN_EMAILS: you@example.com
-      # S3 object storage (optional). Blobs go to the bucket when S3_BUCKET is
-      # set; the bucket is created on start if missing. Upload sessions stay on
-      # the local data volume. AWS S3: S3_FORCE_PATH_STYLE=false.
-      # S3_ENDPOINT: https://s3.eu-central-1.amazonaws.com
-      # S3_REGION: eu-central-1
-      # S3_BUCKET: doreg
-      # S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
-      # S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
-      # S3_FORCE_PATH_STYLE: "false"
+      # Blobs on S3 instead of the data volume: see compose.s3.yaml.
     volumes:
       - doreg-data:/data
     ports:

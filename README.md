@@ -61,7 +61,8 @@ volumes:
 DOREG_ADMIN_PASSWORD='choose-a-long-password' docker compose up -d
 ```
 
-[`compose.prod.yaml`](compose.prod.yaml) has the full version with Traefik, SSO and S3 options.
+[`deploy/compose.yaml`](deploy/compose.yaml) has the full version with Traefik and SSO options;
+[`deploy/compose.s3.yaml`](deploy/compose.s3.yaml) adds a bundled RustFS for S3 blob storage.
 
 **2. Push something.**
 
@@ -75,7 +76,7 @@ docker push reg.example.com/my-app:1.0
 
 > [!TIP]
 > Put it behind a TLS-terminating proxy (Traefik, Caddy, nginx): docker only sends credentials over
-> HTTPS, except to `localhost`. [`compose.prod.yaml`](compose.prod.yaml) is a complete Traefik example.
+> HTTPS, except to `localhost`. [`deploy/compose.yaml`](deploy/compose.yaml) is a complete Traefik example.
 > Raise the proxy's read timeout too, since big layers take longer than 60 seconds.
 
 ## What you get

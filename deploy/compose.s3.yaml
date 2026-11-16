@@ -1,0 +1,79 @@
+# Example deployment with blobs in S3, served by a bundled RustFS. For an
+# external S3 (AWS, Hetzner, …) drop the rustfs service and set S3_ENDPOINT,
+# S3_REGION and S3_FORCE_PATH_STYLE=false.
+#
+# Behind Traefik: layer pushes can take minutes, so raise the entrypoint's
+# readTimeout (Traefik v3 defaults to 60s), e.g.
+#   --entrypoints.websecure.transport.respondingTimeouts.readTimeout=0
+#
+#   RUSTFS_ACCESS_KEY=... RUSTFS_SECRET_KEY=... DOREG_ADMIN_PASSWORD=... \
+#     docker compose -f compose.s3.yaml up -d
+
+# Fixed project name, so volumes are doreg_* regardless of the directory.
+name: doreg
+
+services:
+  doreg:
+    image: ghcr.io/p-arndt/doreg:latest
+    restart: unless-stopped
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    environment:
+      # Creates this admin on first start if no users exist; remove afterwards.
+      DOREG_ADMIN_USER: admin
+      # Optional with SSO: without it the first SSO login becomes admin.
+      DOREG_ADMIN_PASSWORD: ${DOREG_ADMIN_PASSWORD:-}
+      # Single sign-on (optional). Uncomment to enable OIDC login. Register
+      # https://reg.example.com/api/auth/oidc/callback as the redirect URI at the
+      # provider. Keycloak: OIDC_ISSUER=https://sso.example.com/realms/<realm>.
+      # OIDC_ISSUER: https://sso.example.com
+      # OIDC_CLIENT_ID: doreg
+      # OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?set OIDC_CLIENT_SECRET}
+      # OIDC_REDIRECT_URI: https://reg.example.com/api/auth/oidc/callback
+      # OIDC_PROVIDER_NAME: SSO
+      # Members of this group or role become system admins.
+      # OIDC_ADMIN_ROLE: doreg-admins
+      # OIDC_ADMIN_EMAILS: you@example.com
+      # Blobs go to the bucket; doreg creates it on start if missing. Upload
+      # sessions and the SQLite metadata stay on doreg-data, so keep that
+      # volume too.
+      S3_ENDPOINT: http://rustfs:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: doreg
+      S3_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      S3_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: "true"
+    volumes:
+      - doreg-data:/data
+    ports:
+      - "8080:8080"
+
+  rustfs:
+    image: rustfs/rustfs:1.0.6
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
+      # Web console on :9001, reachable only from this host. Tunnel to it
+      # (ssh -L 9001:localhost:9001) instead of publishing it.
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+    volumes:
+      - rustfs-data:/data
+    ports:
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  doreg-data:
+  rustfs-data:
