@@ -4,13 +4,13 @@ Self-hosted OCI container registry: Go server (`/v2/` registry API, `/api/` JSON
 
 ## Layout
 
-- `cmd/doreg` — CLI: `serve`, `user`, `gc`, `version`
+- `cmd/doreg` — CLI: `serve`, `user`, `gc`, `login` (device-code SSO login, then `docker login`; the HTTP part is tested against an httptest server), `version`
 - `internal/registry` — OCI distribution API (uploads, manifests, tags, referrers, auth). Integration and GC tests live here (`*_test.go`), including a push-during-GC stress test.
 - `internal/gc` — mark and sweep, retention policies, scheduler
 - `internal/auth` — `Authenticator`: resolves Basic credentials (robot secret, user password or CLI secret) to a principal, caches them, and decides permissions in `Can`
 - `internal/events` — `Bus`: `Emit` writes the audit log and queues webhook deliveries (signed, retried); `Audit` records admin actions that are not webhook events
 - `internal/oidc` — single sign-on (OpenID Connect, PKCE); configuration from `OIDC_*`
-- `compose.yaml` — dev stack: minisuite (minicloak OIDC, minibucket S3, overview) plus doreg built from this repo; `compose.prod.yaml` is the production example. Env names follow the shared `OIDC_*` / `S3_*` convention.
+- `compose.yaml` — dev dependencies only: minisuite (minicloak OIDC, minibucket S3, overview) and a socat push proxy on :5050; doreg itself runs on the host via `just dev` (loads `.env`). `compose.prod.yaml` is the production example. Env names follow the shared `OIDC_*` / `S3_*` convention.
 - `internal/meta` — SQLite metadata, one writer connection, read pool. Schema lives in `migrations/NNN_name.sql`, applied in order and tracked with `PRAGMA user_version`; each file runs in its own transaction. Projects, robots, webhooks and audit log are here too.
 - `internal/meta/migrations` — schema history. A schema change is a new numbered file; never edit a file that has been applied.
 - `internal/storage` — content-addressed blob files, uploads, per-digest locks

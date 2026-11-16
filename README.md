@@ -16,7 +16,7 @@ A self-hosted container registry with a web UI that is pleasant to use and garba
 ## Install
 
 ```sh
-docker run -d --name doreg -p 5000:5000 -v doreg-data:/data \
+docker run -d --name doreg -p 8080:8080 -v doreg-data:/data \
   -e DOREG_ADMIN_PASSWORD='choose-a-long-password' ghcr.io/p-arndt/doreg:latest
 ```
 
@@ -90,7 +90,15 @@ doreg logs users in through an OpenID Connect provider (authorization code flow 
 | `OIDC_SCOPES` | `openid,profile,email` | Scopes, comma- or space-separated. |
 | `OIDC_USERNAME_CLAIM` | `preferred_username` | Claim used as the doreg username. |
 | `OIDC_GROUPS_CLAIM` | empty | Claim holding group names. Empty: the `groups`, `roles` and `realm_access.roles` claims are all read and merged. |
-| `OIDC_ADMIN_ROLE` | empty | A group or role that makes its members system admins. Leaving it demotes them at their next login. Empty: groups never change system admin rights. |
+| `OIDC_ADMIN_ROLE` | empty | A group or role that makes its members system admins. |
+| `OIDC_ADMIN_EMAILS` | empty | Comma-separated emails that make their owners system admins, only if the provider marks the email as verified. |
+
+### Who becomes admin
+
+1. If `OIDC_ADMIN_ROLE` or `OIDC_ADMIN_EMAILS` is set, they decide at every SSO login: users matching either become admins, everyone else is a normal user. Removing the role at the provider (or the email from the list) demotes at the next login.
+2. If neither is set, roles are managed in doreg (Users page). While the instance has no admin at all, the first person who signs in via SSO becomes admin; doreg logs a warning and an audit entry. Only accounts of your identity provider can sign in, so set one of the variables before opening a provider to the public.
+
+`DOREG_ADMIN_PASSWORD` is optional with SSO. Keep a local admin only as a fallback for when the provider is down.
 
 Setup, with any provider (Authentik, Keycloak, and others alike):
 
@@ -106,6 +114,26 @@ Notes:
 
 ```sh
 docker login reg.example.com -u alice   # password: the CLI secret from the account page
+```
+
+### Command-line login
+
+With SSO, `doreg login` does the same without copying a secret:
+
+```sh
+doreg login reg.example.com
+```
+
+It prints a code and a link, opens the browser (`--no-browser` only prints the link), and waits until you approve the code on the account page. Then it runs `docker login` with a new token. The token is valid for 90 days and can be revoked on the account page under Command-line logins.
+
+- `--docker-host HOST` is the host passed to `docker login`, if it differs from the registry you log in to.
+- `--print` writes the username and token to stdout instead of running docker, for CI and other tools.
+- Machines without a browser can use the CLI secret from the account page, as shown above.
+
+Development setup: the UI and SSO run on Vite at localhost:5173, while pushes go through the proxy on port 5050:
+
+```sh
+doreg login --docker-host localhost:5050 localhost:5173
 ```
 
 ## Storage
@@ -184,15 +212,25 @@ Mark and sweep of metadata run in one SQLite write transaction; a manifest push 
 
 ```sh
 cp .env.example .env
-docker compose up -d --build   # doreg on localhost:5000, overview on localhost:9900
-just web-dev                   # UI dev server with hot reload, proxying to :5000
+docker compose up -d   # minisuite (OIDC, S3, mail) and the push proxy
+just dev               # API on localhost:8080 plus the UI with hot reload on localhost:5173
 ```
 
-`compose.yaml` runs [minisuite](https://github.com/p-arndt/minisuite) (OIDC provider, S3, mail) next to doreg. Sign in with SSO as `alice` (admin) or `bob` (normal user); the passwords are the same as the usernames. The overview page lists all URLs and credentials.
+Open http://localhost:5173: Vite serves the UI with hot reload and proxies `/api` and `/v2` to the API, and the dev SSO login returns there too. `just dev-api` runs only the API; `just web-build` embeds the UI into the binary.
+
+`compose.yaml` holds only the dependencies, [minisuite](https://github.com/p-arndt/minisuite); doreg runs on the host. Sign in with SSO as `alice` (admin) or `bob` (normal user); the passwords are the same as the usernames. The overview page at localhost:9900 lists all URLs.
+
+Docker Desktop's daemon cannot reach a process on the host's localhost, so push and pull through the proxy on port 5050:
+
+```sh
+docker login localhost:5050 -u alice   # password: CLI secret from the account page
+docker push localhost:5050/team/api:dev
+```
+
+`go run ./cmd/doreg login ...` runs the CLI without installing it, for example `go run ./cmd/doreg login --docker-host localhost:5050 localhost:5173`.
 
 ```sh
 just          # list recipes
-just dev      # build the UI and run doreg on :5000 with data in ./data
 just ci       # gofmt, vet, tests, UI check, lint and tests
 just release  # cut a release (stamp)
 ```
