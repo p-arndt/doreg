@@ -37,6 +37,10 @@ Usage:
   doreg gc     [--data DIR] [--dry-run] [--retention]
   doreg login  [--docker-host HOST] [--no-browser] [--print] REGISTRY
                (SSO login in the browser, then docker login)
+  doreg import --from URL --to URL [--from-user U] [--to-user U] [--repo PATTERN]...
+               [--from-insecure] [--concurrency N] [--dry-run]
+               (copy repositories from another registry, e.g. registry:2;
+               passwords in DOREG_FROM_PASSWORD and DOREG_TO_PASSWORD)
   doreg version
 
 Environment:
@@ -61,6 +65,8 @@ func main() {
 		err = runGC(os.Args[2:])
 	case "login":
 		err = login(os.Args[2:])
+	case "import":
+		err = runImport(os.Args[2:])
 	case "version", "--version", "-v":
 		fmt.Printf("doreg %s (commit %s, built %s)\n", buildinfo.Version, buildinfo.Commit, buildinfo.Date)
 	case "help", "--help", "-h":
