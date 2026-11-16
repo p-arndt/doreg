@@ -15,7 +15,7 @@ and garbage collection that never asks you to go read-only. One binary, no extra
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](go.mod)
 [![License: MIT](https://img.shields.io/badge/license-MIT-informational)](LICENSE)
 
-[Quick start](#-quick-start) · [What you get](#what-you-get) · [Access](#-projects-robots-and-sso) · [Storage](#-storage) · [Webhooks](#-webhooks) · [Garbage collection](#-garbage-collection) · [Development](#%EF%B8%8F-development)
+[Quick start](#-quick-start) · [What you get](#what-you-get) · [Access](#-projects-robots-and-sso) · [Storage](#-storage) · [Webhooks](#-webhooks) · [Garbage collection](#-garbage-collection) · [Migrating](#-migrating-from-registry2) · [Development](#%EF%B8%8F-development)
 
 <br />
 
@@ -89,6 +89,7 @@ docker push reg.example.com/my-app:1.0
 | 🤖 **Robot accounts** | Credentials for CI: pull by default, push and delete if you say so, with expiry and secret rotation. |
 | 🪪 **Single sign-on** | Any OpenID Connect provider. `doreg login` logs docker in through the browser, no secret copying. |
 | 🔔 **Webhooks and audit log** | Signed, retried webhooks for pushes, pulls, deletes, quota hits and GC runs. Every change is in the audit log. |
+| 🚚 **Import** | Pull every repository of an existing registry (registry:2, Harbor, GHCR, ...) in from the UI. Digests stay the same, reruns skip what's done. |
 | 🪶 **Small** | One static binary or a 22 MB distroless image. SQLite plus blobs on disk or in any S3 bucket. |
 
 <table>
@@ -250,13 +251,27 @@ Mark and sweep of metadata run in one SQLite write transaction; a manifest push 
 
 ## 🚚 Migrating from registry:2
 
-Copy images over the API, e.g. with [regclient](https://github.com/regclient/regclient):
+Open **Import** in the UI (admins only), enter the old registry's URL and, if it needs one, its login,
+hit **Preview** to see what will be copied, then **Start import**. doreg pulls every tag over the
+registry API and stores it like a push:
+
+- Manifests are copied byte for byte, so digests don't change and `image@sha256:...` references keep working. Multi-arch indexes come along with all their platforms.
+- Logins: htpasswd (Basic) and token auth (`auth: token`, Docker Hub, GHCR) both work. The password is used for that one import and never stored. A self-signed certificate needs **Skip TLS certificate check**.
+- Narrow it down with names or patterns like `team/*`. Registries without `/v2/_catalog` (Docker Hub) need plain repository names.
+- Tags already up to date are skipped and shared layers are transferred once, so an interrupted import is simply started again.
+- Pushes land in the audit log under the admin who started the import but fire **no webhooks**, so old images don't trigger deployments. Names without a slash land in the `library` project.
+- Only tagged images are copied; untagged manifests and referrers without a tag (e.g. OCI 1.1 signatures) stay behind.
+
+The same works from any machine with the CLI, against a running doreg:
 
 ```sh
-regctl repo ls old.example.com | while read repo; do
-  regctl image copy --all-tags old.example.com/$repo new.example.com/$repo
-done
+export DOREG_FROM_PASSWORD=...   # old registry
+export DOREG_TO_PASSWORD=...     # doreg admin password or CLI secret
+doreg import --from https://old.example.com:5000 --from-user migrate \
+             --to https://registry.example.com --to-user admin --dry-run
 ```
+
+Drop `--dry-run` to copy. `--repo 'team/*'` (repeatable) limits it, `--from-insecure` skips the TLS check, and `--concurrency` sets how many tags are copied at once (default 4). Run with the doreg image instead of a local binary: `docker run --rm -e DOREG_FROM_PASSWORD -e DOREG_TO_PASSWORD <doreg-image> import ...`.
 
 ## 🛠️ Development
 

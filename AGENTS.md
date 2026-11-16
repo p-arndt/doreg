@@ -4,8 +4,9 @@ Self-hosted OCI container registry: Go server (`/v2/` registry API, `/api/` JSON
 
 ## Layout
 
-- `cmd/doreg` — CLI: `serve`, `user`, `gc`, `login` (device-code SSO login, then `docker login`; the HTTP part is tested against an httptest server), `version`
+- `cmd/doreg` — CLI: `serve`, `user`, `gc`, `login` (device-code SSO login, then `docker login`; the HTTP part is tested against an httptest server), `import` (copy from another registry into a running doreg over HTTP), `version`
 - `internal/registry` — OCI distribution API (uploads, manifests, tags, referrers, auth). Integration and GC tests live here (`*_test.go`), including a push-during-GC stress test.
+- `internal/importer` — copies repositories from another OCI registry (Basic and Bearer token auth). The server-side import (`/api/import`, UI page `/import`) pushes through `registry.Handler.Transport`, i.e. the normal `/v2/` path in-process, so permissions, quotas, digest locks and events apply unchanged; imports emit with `events.WithoutWebhooks`.
 - `internal/gc` — mark and sweep, retention policies, scheduler
 - `internal/auth` — `Authenticator`: resolves Basic credentials (robot secret, user password or CLI secret) to a principal, caches them, and decides permissions in `Can`
 - `internal/events` — `Bus`: `Emit` writes the audit log and queues webhook deliveries (signed, retried); `Audit` records admin actions that are not webhook events
