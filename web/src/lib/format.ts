@@ -109,6 +109,48 @@ export function historyCommand(createdBy: string | undefined): string {
 		.trim();
 }
 
+/**
+ * The HEALTHCHECK test as written in the Dockerfile: shell form as plain text,
+ * exec form as a JSON array. Empty when the image inherits its base's check.
+ */
+export function healthcheckCommand(test: string[] | undefined): string {
+	if (!test?.length) return '';
+	const [kind, ...args] = test;
+	if (kind === 'NONE') return 'disabled';
+	if (kind === 'CMD-SHELL') return args.join(' ');
+	if (kind === 'CMD') return JSON.stringify(args);
+	return JSON.stringify(test);
+}
+
+/** Go-style duration ("1m30s", "500ms") from nanoseconds. */
+export function duration(ns: number): string {
+	if (ns <= 0) return '0s';
+	if (ns < 1e9) return `${Math.round(ns / 1e6)}ms`;
+	let s = Math.round(ns / 1e9);
+	const h = Math.floor(s / 3600);
+	s -= h * 3600;
+	const m = Math.floor(s / 60);
+	s -= m * 60;
+	return (h ? `${h}h` : '') + (m ? `${m}m` : '') + (s || (!h && !m) ? `${s}s` : '');
+}
+
+/** The HEALTHCHECK options that differ from Docker's defaults, in Dockerfile order. */
+export function healthcheckTiming(h: {
+	Interval?: number;
+	Timeout?: number;
+	StartPeriod?: number;
+	StartInterval?: number;
+	Retries?: number;
+}): string {
+	const parts = [];
+	if (h.Interval) parts.push(`every ${duration(h.Interval)}`);
+	if (h.Timeout) parts.push(`timeout ${duration(h.Timeout)}`);
+	if (h.StartPeriod) parts.push(`start period ${duration(h.StartPeriod)}`);
+	if (h.StartInterval) parts.push(`start interval ${duration(h.StartInterval)}`);
+	if (h.Retries) parts.push(plural(h.Retries, 'retry', 'retries'));
+	return parts.join(', ');
+}
+
 /** One-line summary of a retention rule: "keep the newest 10, delete the rest". */
 export function describePolicy(p: { keepLast: number; olderThanDays: number }): string {
 	const parts = [];

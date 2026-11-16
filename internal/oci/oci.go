@@ -141,6 +141,17 @@ func IsAttestation(d Descriptor) bool {
 	return d.Platform != nil && d.Platform.OS == "unknown" && d.Platform.Architecture == "unknown"
 }
 
+// Healthcheck is Docker's HEALTHCHECK extension to the image config.
+// Durations are nanoseconds; zero means the Docker default.
+type Healthcheck struct {
+	Test          []string `json:"Test,omitempty"`
+	Interval      int64    `json:"Interval,omitempty"`
+	Timeout       int64    `json:"Timeout,omitempty"`
+	StartPeriod   int64    `json:"StartPeriod,omitempty"`
+	StartInterval int64    `json:"StartInterval,omitempty"`
+	Retries       int      `json:"Retries,omitempty"`
+}
+
 // ImageConfig is the subset of the image config the UI shows.
 type ImageConfig struct {
 	Architecture string `json:"architecture"`
@@ -158,6 +169,9 @@ type ImageConfig struct {
 		ExposedPorts map[string]struct{} `json:"ExposedPorts,omitempty"`
 		Volumes      map[string]struct{} `json:"Volumes,omitempty"`
 		StopSignal   string              `json:"StopSignal,omitempty"`
+		Healthcheck  *Healthcheck        `json:"Healthcheck,omitempty"`
+		Shell        []string            `json:"Shell,omitempty"`
+		OnBuild      []string            `json:"OnBuild,omitempty"`
 	} `json:"config"`
 	History []struct {
 		Created    string `json:"created,omitempty"`

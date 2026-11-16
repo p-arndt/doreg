@@ -3,7 +3,10 @@ import {
 	ago,
 	bytes,
 	describePolicy,
+	duration,
 	fraction,
+	healthcheckCommand,
+	healthcheckTiming,
 	historyCommand,
 	mediaTypeLabel,
 	normalizeUserCode,
@@ -166,5 +169,39 @@ describe('normalizeUserCode', () => {
 		expect(normalizeUserCode(' bcdf ghjk ')).toBe('BCDF-GHJK');
 		expect(normalizeUserCode('BCDF-GHJK')).toBe('BCDF-GHJK');
 		expect(normalizeUserCode('bcd')).toBe('BCD');
+	});
+});
+
+describe('healthcheckCommand', () => {
+	it('renders each HEALTHCHECK form like the Dockerfile', () => {
+		expect(healthcheckCommand(['CMD-SHELL', 'curl -f http://localhost/ || exit 1'])).toBe(
+			'curl -f http://localhost/ || exit 1'
+		);
+		expect(healthcheckCommand(['CMD', '/healthz', '--quiet'])).toBe('["/healthz","--quiet"]');
+		expect(healthcheckCommand(['NONE'])).toBe('disabled');
+		expect(healthcheckCommand([])).toBe('');
+		expect(healthcheckCommand(undefined)).toBe('');
+	});
+});
+
+describe('duration', () => {
+	it('formats nanoseconds like Go', () => {
+		expect(duration(30e9)).toBe('30s');
+		expect(duration(90e9)).toBe('1m30s');
+		expect(duration(3600e9)).toBe('1h');
+		expect(duration(500e6)).toBe('500ms');
+		expect(duration(0)).toBe('0s');
+	});
+});
+
+describe('healthcheckTiming', () => {
+	it('lists only the options that were set', () => {
+		expect(healthcheckTiming({ Interval: 30e9, Timeout: 3e9, Retries: 3 })).toBe(
+			'every 30s, timeout 3s, 3 retries'
+		);
+		expect(healthcheckTiming({ StartPeriod: 5e9, StartInterval: 1e9, Retries: 1 })).toBe(
+			'start period 5s, start interval 1s, 1 retry'
+		);
+		expect(healthcheckTiming({})).toBe('');
 	});
 });

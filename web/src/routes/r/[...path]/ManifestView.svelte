@@ -5,6 +5,8 @@
 	import {
 		bytes,
 		fraction,
+		healthcheckCommand,
+		healthcheckTiming,
 		historyCommand,
 		mediaTypeLabel,
 		platform,
@@ -101,6 +103,14 @@
 		if (cfg?.ExposedPorts) items.push(['Ports', Object.keys(cfg.ExposedPorts).join(', ')]);
 		if (cfg?.Volumes) items.push(['Volumes', Object.keys(cfg.Volumes).join(', ')]);
 		if (cfg?.StopSignal) items.push(['Stop signal', cfg.StopSignal]);
+		const check = healthcheckCommand(cfg?.Healthcheck?.Test);
+		if (check) {
+			items.push(['Healthcheck', check]);
+			const timing = check === 'disabled' ? '' : healthcheckTiming(cfg!.Healthcheck!);
+			if (timing) items.push(['Health timing', timing]);
+		}
+		if (cfg?.Shell) items.push(['Shell', JSON.stringify(cfg.Shell)]);
+		if (cfg?.OnBuild?.length) items.push(['On build', cfg.OnBuild.join(' · ')]);
 		if (m.config.author) items.push(['Author', m.config.author]);
 		return items;
 	});

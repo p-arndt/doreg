@@ -83,6 +83,16 @@ export interface Descriptor {
 	size: number;
 }
 
+/** Docker HEALTHCHECK; durations in nanoseconds, 0 means the default. */
+export interface Healthcheck {
+	Test?: string[];
+	Interval?: number;
+	Timeout?: number;
+	StartPeriod?: number;
+	StartInterval?: number;
+	Retries?: number;
+}
+
 export interface ImageConfig {
 	architecture: string;
 	os: string;
@@ -99,6 +109,9 @@ export interface ImageConfig {
 		ExposedPorts?: Record<string, object>;
 		Volumes?: Record<string, object>;
 		StopSignal?: string;
+		Healthcheck?: Healthcheck;
+		Shell?: string[];
+		OnBuild?: string[];
 	};
 	history?: { created?: string; created_by?: string; comment?: string; empty_layer?: boolean }[];
 }
