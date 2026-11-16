@@ -206,3 +206,13 @@ func (db *DB) DeleteUserSessions(ctx context.Context, userID int64) error {
 	_, err := db.W.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ?`, userID)
 	return err
 }
+
+// DeleteUserSessionsExcept logs a user out everywhere but the session with
+// keepToken; an empty keepToken keeps none.
+func (db *DB) DeleteUserSessionsExcept(ctx context.Context, userID int64, keepToken string) error {
+	if keepToken == "" {
+		return db.DeleteUserSessions(ctx, userID)
+	}
+	_, err := db.W.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?`, userID, hashToken(keepToken))
+	return err
+}

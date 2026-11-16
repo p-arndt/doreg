@@ -27,6 +27,9 @@ import (
 const (
 	sessionCookie = "doreg_session"
 	sessionTTL    = 30 * 24 * time.Hour
+	// SSO accounts are disabled at the provider, which doreg only notices at
+	// the next login; a short session bounds how long a removed user stays in.
+	ssoSessionTTL = 24 * time.Hour
 )
 
 // API serves /api/.
@@ -220,7 +223,11 @@ func (a *API) startSession(w http.ResponseWriter, r *http.Request, u meta.User) 
 	b := make([]byte, 32)
 	rand.Read(b)
 	token := hex.EncodeToString(b)
-	expires := time.Now().Add(sessionTTL)
+	ttl := sessionTTL
+	if u.SSO() {
+		ttl = ssoSessionTTL
+	}
+	expires := time.Now().Add(ttl)
 	if err := a.DB.CreateSession(r.Context(), token, u.ID, expires.Unix()); err != nil {
 		return err
 	}

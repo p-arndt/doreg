@@ -347,6 +347,19 @@ func TestOIDCAdminGroupTogglesRole(t *testing.T) {
 	}
 
 	e.idp.setUser("sub-bob", "bob", "bob@example.com", "dev")
+func TestOIDCSessionIsShortLived(t *testing.T) {
+	e := newOIDCEnv(t, "")
+	e.idp.setUser("sub-1", "alice", "alice@example.com")
+	session := cookieNamed(e.login(t, "/"), "doreg_session")
+	if session == nil {
+		t.Fatal("callback did not set doreg_session")
+	}
+	const want = 24 * time.Hour
+	if left := time.Until(session.Expires); left > want || left < want-time.Minute {
+		t.Errorf("SSO session expires in %s, want about %s", left, want)
+	}
+}
+
 	if resp := e.login(t, "/"); resp.StatusCode != http.StatusFound {
 		t.Fatalf("second login: status %d, want 302", resp.StatusCode)
 	}

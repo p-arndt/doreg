@@ -240,6 +240,18 @@ func (a *API) updateUser(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
+	// A new password must lock out whoever knew the old one; the role alone is
+	// read from the database on every request and needs no logout.
+	if hash != "" {
+		keep := ""
+		if id == currentUser(r).ID {
+			keep = requestSessionToken(r)
+		}
+		if err := a.DB.DeleteUserSessionsExcept(r.Context(), id, keep); err != nil {
+			a.fail(w, r, err)
+			return
+		}
+	}
 	a.Auth.Invalidate()
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -293,7 +305,13 @@ func (a *API) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := currentUser(r)
-	if _, ok := a.Auth.Check(r.Context(), u.Username, b.Current); !ok {
+	if u.PasswordHash == "" {
+		writeErr(w, http.StatusBadRequest, "this account signs in through single sign-on and has no password")
+		return
+	}
+	// CheckPassword, not Check: a CLI secret can be minted with only a session,
+	// so accepting it here would let a stolen session take over the account.
+	if _, ok := a.Auth.CheckPassword(r.Context(), u.Username, b.Current); !ok {
 		writeErr(w, http.StatusBadRequest, "current password is wrong")
 		return
 	}
@@ -310,6 +328,19 @@ func (a *API) changePassword(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
+	if err := a.DB.DeleteUserSessionsExcept(r.Context(), u.ID, requestSessionToken(r)); err != nil {
+		a.fail(w, r, err)
+		return
+	}
 	a.Auth.Invalidate()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// requestSessionToken returns the session token of the request, or "" if it
+// has none.
+func requestSessionToken(r *http.Request) string {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		return c.Value
+	}
+	return ""
 }
