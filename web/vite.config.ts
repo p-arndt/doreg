@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 
-const backend = 'http://localhost:5000';
+const backend = 'http://localhost:8080';
 
 interface ProxyReq {
 	getHeader(name: string): unknown;
@@ -11,6 +11,9 @@ interface ProxyReq {
 
 export default defineConfig({
 	server: {
+		// Fixed, because the dev OIDC client allows exactly this redirect origin.
+		port: 5173,
+		strictPort: true,
 		// doreg rejects cross-origin writes, so the proxy presents itself as the backend's own origin.
 		proxy: Object.fromEntries(
 			['/api', '/v2'].map((path) => [

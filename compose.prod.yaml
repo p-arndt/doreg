@@ -8,7 +8,8 @@ services:
     environment:
       # Creates this admin on first start if no users exist; remove afterwards.
       DOREG_ADMIN_USER: admin
-      DOREG_ADMIN_PASSWORD: ${DOREG_ADMIN_PASSWORD:?set DOREG_ADMIN_PASSWORD}
+      # Optional with SSO: without it the first SSO login becomes admin.
+      DOREG_ADMIN_PASSWORD: ${DOREG_ADMIN_PASSWORD:-}
       # Single sign-on (optional). Uncomment to enable OIDC login. Register
       # https://reg.example.com/api/auth/oidc/callback as the redirect URI at the
       # provider. Keycloak: OIDC_ISSUER=https://sso.example.com/realms/<realm>.
@@ -19,6 +20,7 @@ services:
       # OIDC_PROVIDER_NAME: SSO
       # Members of this group or role become system admins.
       # OIDC_ADMIN_ROLE: doreg-admins
+      # OIDC_ADMIN_EMAILS: you@example.com
       # S3 object storage (optional). Blobs go to the bucket when S3_BUCKET is
       # set; the bucket is created on start if missing. Upload sessions stay on
       # the local data volume. AWS S3: S3_FORCE_PATH_STYLE=false.
@@ -31,7 +33,7 @@ services:
     volumes:
       - doreg-data:/data
     ports:
-      - "5000:5000"
+      - "8080:8080"
 
 volumes:
   doreg-data:

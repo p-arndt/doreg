@@ -25,8 +25,8 @@ RUN mkdir -p /out/data
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/doreg /doreg
 COPY --from=build --chown=65532:65532 /out/data /data
-ENV DOREG_DATA=/data DOREG_ADDR=:5000
+ENV DOREG_DATA=/data DOREG_ADDR=:8080
 VOLUME /data
-EXPOSE 5000
+EXPOSE 8080
 ENTRYPOINT ["/doreg"]
 CMD ["serve"]

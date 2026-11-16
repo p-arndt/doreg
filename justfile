@@ -6,6 +6,9 @@ import '.just/go.just'
 import '.just/docker.just'
 import '.just/release.just'
 
+# OIDC_* and S3_* for `just dev` come from .env (see .env.example).
+set dotenv-load
+
 set allow-duplicate-variables
 set allow-duplicate-recipes
 
@@ -22,7 +25,7 @@ web-install:
 web-build:
     pnpm --dir web build
 
-# Run the UI dev server (proxies /api and /v2 to a local doreg on :5000).
+# Run the UI dev server (proxies /api and /v2 to a local doreg on :8080).
 web-dev:
     pnpm --dir web dev
 
@@ -32,9 +35,13 @@ web-check:
     pnpm --dir web lint
     pnpm --dir web test
 
-# Run doreg locally with data in ./data.
-dev: web-build
-    go run {{MAIN}} serve --data ./data --addr :5000
+# Run the doreg API on :8080 with data in ./data (no UI build; `just dev` pairs it with Vite).
+dev-api:
+    go run {{MAIN}} serve --data ./data --addr :8080
+
+# Develop: API on :8080 plus the UI with hot reload on :5173. Open localhost:5173. Deps: `docker compose up -d`.
+[parallel]
+dev: dev-api web-dev
 
 # Build a release binary with the UI embedded.
 build-release: web-build

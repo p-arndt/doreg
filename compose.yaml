@@ -1,10 +1,6 @@
-# Development stack: minisuite (OIDC, S3) plus doreg built from this repo.
-# Copy .env.example to .env first. Overview of all URLs at http://localhost:9900.
-#
-# doreg shares the network namespace of the suite container. Inside doreg,
-# localhost:9500 (OIDC) and localhost:9000 (S3) reach minisuite. The browser
-# and the docker daemon reach doreg at localhost:5000 through the port that the
-# suite service publishes, so no port is declared on doreg itself.
+# Development dependencies: minisuite (OIDC via minicloak, S3 via minibucket,
+# mail sink). doreg itself runs on the host with `just dev`, like the apps in
+# the other repos. Copy .env.example to .env first. All URLs: http://localhost:9900.
 services:
   suite:
     image: ghcr.io/p-arndt/minisuite:0.4.0
@@ -18,15 +14,13 @@ services:
       - 127.0.0.1:8025:8025
       # Overview page.
       - 127.0.0.1:9900:9900
-      # doreg, published here because it runs in this network namespace.
-      - 127.0.0.1:5000:5000
     environment:
       MINIBUCKET_ACCESS_KEY: minioadmin
       MINIBUCKET_SECRET_KEY: minioadmin
       MINIBUCKET_REGION: us-east-1
       MINICLOAK_ISSUER: http://localhost:9500/realms/dev
-      # client_id=secret:redirect[,redirect]. 5000 is doreg, 5173 is `just web-dev`.
-      MINICLOAK_CLIENT: 'doreg=doreg-dev-secret:http://localhost:5000/*,http://localhost:5173/*'
+      # client_id=secret:redirect[,redirect]. 8080 is `just dev`, 5173 is `just web-dev`.
+      MINICLOAK_CLIENT: 'doreg=doreg-dev-secret:http://localhost:8080/*,http://localhost:5173/*'
       # username=password:email:name:roles, several separated by ';'. Roles
       # become the `roles` and `realm_access.roles` claims. alice is the
       # registry admin; bob is a normal user to add to a project via a group.
@@ -34,16 +28,18 @@ services:
     volumes:
       - suitedata:/data
 
-  doreg:
-    build: .
+  # The docker daemon runs in a VM (Docker Desktop) and cannot reach a process
+  # on the host's localhost:8080. This forwards localhost:5050, which the
+  # daemon can reach as a published container port, to doreg on the host:
+  #   docker push localhost:5050/team/api:dev
+  push-proxy:
+    image: alpine/socat:1.8.0.3
     restart: unless-stopped
-    network_mode: "service:suite"
-    env_file: .env
-    volumes:
-      - doreg-data:/data
-    depends_on:
-      - suite
+    command: TCP-LISTEN:5050,fork,reuseaddr TCP:host.docker.internal:8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - 127.0.0.1:5050:5050
 
 volumes:
   suitedata:
-  doreg-data:

@@ -31,7 +31,7 @@ import (
 const usage = `doreg — container registry with web UI and online garbage collection
 
 Usage:
-  doreg serve  [--data DIR] [--addr :5000]
+  doreg serve  [--data DIR] [--addr :8080]
   doreg user   add|set|delete|list [--data DIR] [--role admin|user] NAME
                (password is read from stdin)
   doreg gc     [--data DIR] [--dry-run] [--retention]
@@ -39,7 +39,7 @@ Usage:
 
 Environment:
   DOREG_DATA            data directory (default ./data)
-  DOREG_ADDR            listen address (default :5000)
+  DOREG_ADDR            listen address (default :8080)
   DOREG_ADMIN_USER      with DOREG_ADMIN_PASSWORD: create this admin on start if no users exist
   DOREG_ADMIN_PASSWORD
 `
@@ -99,7 +99,7 @@ func open(dataDir string) (*app, error) {
 func serve(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	data := fs.String("data", env("DOREG_DATA", "./data"), "data directory")
-	addr := fs.String("addr", env("DOREG_ADDR", ":5000"), "listen address")
+	addr := fs.String("addr", env("DOREG_ADDR", ":8080"), "listen address")
 	fs.Parse(args)
 
 	a, err := open(*data)
