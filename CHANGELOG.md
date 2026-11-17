@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.0 - 2026-11-17
+
+### Added
+
+- Pull counts per repository and per manifest, shown in the repository list, the repository page and the manifest page
+- Repository Tags tab shows the latest pushed tag with its pull reference and runtime configuration
+
+### Changed
+
+- Pull reference field shows name and tag even when space is short, cutting the host first; the copy format switch lives only on the account page
+
+### Fixed
+
+- READMEs sit centered on the repository overview, and centered READMEs (align=center) line up in one column
+
 ## 0.3.0 - 2026-11-17
 
 ### Added
