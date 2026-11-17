@@ -46,6 +46,7 @@ export interface RepoListItem {
 	tags: number;
 	manifests: number;
 	size: number;
+	pulls: number;
 	lastPush: number;
 	createdAt: number;
 	description?: string;
@@ -66,6 +67,7 @@ export interface ManifestSummary {
 	created?: string;
 	createdAt: number;
 	lastPulledAt: number;
+	pulls: number;
 	isReferrer: boolean;
 }
 
@@ -74,6 +76,7 @@ export interface Repo {
 	public: boolean;
 	createdAt: number;
 	size: number;
+	pulls: number;
 	tags: { name: string; updatedAt: number; manifest: ManifestSummary }[];
 	untagged: ManifestSummary[];
 	/** Markdown source of the README; "" when there is none. */
@@ -133,6 +136,7 @@ export interface ManifestDetail {
 	raw: unknown;
 	createdAt: number;
 	lastPulledAt: number;
+	pulls: number;
 	subject: string;
 	annotations?: Record<string, string>;
 	summary: ManifestSummary;

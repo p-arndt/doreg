@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	ago,
 	bytes,
+	count,
 	describePolicy,
 	duration,
 	fraction,
@@ -31,6 +32,15 @@ describe('bytes', () => {
 		expect(bytes(3_450_000)).toBe('3.45 MB');
 		expect(bytes(123_400_000)).toBe('123 MB');
 		expect(bytes(-1)).toBe('unknown');
+	});
+});
+
+describe('count', () => {
+	it('abbreviates large counts', () => {
+		expect(count(0)).toBe('0');
+		expect(count(999)).toBe('999');
+		expect(count(1_234)).toBe('1.2K');
+		expect(count(3_400_000)).toBe('3.4M');
 	});
 });
 

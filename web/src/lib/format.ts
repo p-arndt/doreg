@@ -13,6 +13,13 @@ export function bytes(n: number): string {
 	return `${v.toFixed(digits)} ${units[i]}`;
 }
 
+const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+
+/** Short count for tables, like Docker Hub: 999, 1.2K, 3.4M. */
+export function count(n: number): string {
+	return compact.format(n);
+}
+
 /** First 12 hex characters, the length docker prints. */
 export function shortDigest(d: string): string {
 	const hex = d.includes(':') ? d.slice(d.indexOf(':') + 1) : d;

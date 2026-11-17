@@ -154,6 +154,7 @@ type Manifest struct {
 	Subject      string
 	CreatedAt    int64
 	LastPulledAt int64
+	PullCount    int64
 }
 
 // Ref is one descriptor a manifest references.
@@ -239,7 +240,7 @@ func (db *DB) PutManifest(ctx context.Context, repo string, m Manifest, refs []R
 
 // GetManifest resolves ref (a tag or digest) in repo.
 func (db *DB) GetManifest(ctx context.Context, repo, ref string, isDigest bool) (Manifest, error) {
-	q := `SELECT m.id, m.repo_id, m.digest, m.media_type, m.artifact_type, m.content, m.subject, m.created_at, m.last_pulled_at
+	q := `SELECT m.id, m.repo_id, m.digest, m.media_type, m.artifact_type, m.content, m.subject, m.created_at, m.last_pulled_at, m.pull_count
 		FROM manifests m JOIN repositories r ON r.id = m.repo_id `
 	if isDigest {
 		q += `WHERE r.name = ? AND m.digest = ?`
@@ -248,16 +249,17 @@ func (db *DB) GetManifest(ctx context.Context, repo, ref string, isDigest bool) 
 	}
 	var m Manifest
 	err := db.R.QueryRowContext(ctx, q, repo, ref).Scan(&m.ID, &m.RepoID, &m.Digest, &m.MediaType,
-		&m.ArtifactType, &m.Content, &m.Subject, &m.CreatedAt, &m.LastPulledAt)
+		&m.ArtifactType, &m.Content, &m.Subject, &m.CreatedAt, &m.LastPulledAt, &m.PullCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return m, ErrNotFound
 	}
 	return m, err
 }
 
-// MarkPulled records a pull (throttled), so GC can keep digest-pinned untagged
-// manifests that are still in use.
+// MarkPulled counts a pull and refreshes last_pulled_at (throttled), so GC can
+// keep digest-pinned untagged manifests that are still in use.
 func (db *DB) MarkPulled(ctx context.Context, m Manifest) {
+	db.countPull(m.ID)
 	if now := Now(); now-m.LastPulledAt > touchInterval {
 		_, _ = db.W.ExecContext(ctx, `UPDATE manifests SET last_pulled_at = ? WHERE id = ?`, now, m.ID)
 	}

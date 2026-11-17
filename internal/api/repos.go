@@ -82,6 +82,7 @@ type ManifestSummary struct {
 	Created      string         `json:"created,omitempty"`
 	CreatedAt    int64          `json:"createdAt"`
 	LastPulledAt int64          `json:"lastPulledAt"`
+	Pulls        int64          `json:"pulls"`
 	IsReferrer   bool           `json:"isReferrer"`
 }
 
@@ -89,7 +90,7 @@ type repoManifests map[string]*meta.Manifest
 
 func (a *API) loadManifests(ctx context.Context, repoID int64) (repoManifests, error) {
 	rows, err := a.DB.R.QueryContext(ctx, `
-		SELECT id, digest, media_type, artifact_type, content, subject, created_at, last_pulled_at
+		SELECT id, digest, media_type, artifact_type, content, subject, created_at, last_pulled_at, pull_count
 		FROM manifests WHERE repo_id = ?`, repoID)
 	if err != nil {
 		return nil, err
@@ -99,7 +100,7 @@ func (a *API) loadManifests(ctx context.Context, repoID int64) (repoManifests, e
 	for rows.Next() {
 		m := &meta.Manifest{RepoID: repoID}
 		if err := rows.Scan(&m.ID, &m.Digest, &m.MediaType, &m.ArtifactType, &m.Content, &m.Subject,
-			&m.CreatedAt, &m.LastPulledAt); err != nil {
+			&m.CreatedAt, &m.LastPulledAt, &m.PullCount); err != nil {
 			return nil, err
 		}
 		out[m.Digest] = m
@@ -121,7 +122,7 @@ func imageSize(m *oci.Manifest) int64 {
 func (a *API) summarize(all repoManifests, m *meta.Manifest) ManifestSummary {
 	s := ManifestSummary{
 		Digest: m.Digest, MediaType: m.MediaType, ArtifactType: m.ArtifactType,
-		CreatedAt: m.CreatedAt, LastPulledAt: m.LastPulledAt, IsReferrer: m.Subject != "",
+		CreatedAt: m.CreatedAt, LastPulledAt: m.LastPulledAt, Pulls: m.PullCount, IsReferrer: m.Subject != "",
 		Platforms: []PlatformInfo{},
 	}
 	parsed, err := oci.Parse(m.Content, m.MediaType)
@@ -209,6 +210,7 @@ type repoListItem struct {
 	Tags      int64  `json:"tags"`
 	Manifests int64  `json:"manifests"`
 	Size      int64  `json:"size"`
+	Pulls     int64  `json:"pulls"`
 	LastPush  int64  `json:"lastPush"`
 	CreatedAt int64  `json:"createdAt"`
 	// Description comes from the image labels of the newest tag.
@@ -223,7 +225,8 @@ func (a *API) repos(w http.ResponseWriter, r *http.Request) {
 			(SELECT count(*) FROM tags t WHERE t.repo_id = r.id),
 			(SELECT count(*) FROM manifests m WHERE m.repo_id = r.id),
 			(SELECT CAST(coalesce(sum(b.size), 0) AS BIGINT) FROM repo_blobs rb JOIN blobs b ON b.digest = rb.digest WHERE rb.repo_id = r.id),
-			coalesce((SELECT max(t.updated_at) FROM tags t WHERE t.repo_id = r.id), r.created_at)
+			coalesce((SELECT max(t.updated_at) FROM tags t WHERE t.repo_id = r.id), r.created_at),
+			r.pull_count
 		FROM repositories r ORDER BY r.name`)
 	if err != nil {
 		a.fail(w, r, err)
@@ -236,7 +239,7 @@ func (a *API) repos(w http.ResponseWriter, r *http.Request) {
 	out := []repoListItem{}
 	for rows.Next() {
 		var it repoListItem
-		if err := rows.Scan(&it.id, &it.Name, &it.Public, &it.CreatedAt, &it.Tags, &it.Manifests, &it.Size, &it.LastPush); err != nil {
+		if err := rows.Scan(&it.id, &it.Name, &it.Public, &it.CreatedAt, &it.Tags, &it.Manifests, &it.Size, &it.LastPush, &it.Pulls); err != nil {
 			a.fail(w, r, err)
 			return
 		}
@@ -353,10 +356,11 @@ func (a *API) repo(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(untagged, func(i, j int) bool { return untagged[i].CreatedAt > untagged[j].CreatedAt })
 
-	var size int64
+	var size, pulls int64
 	_ = a.DB.R.QueryRowContext(ctx, `
 		SELECT CAST(coalesce(sum(b.size), 0) AS BIGINT) FROM repo_blobs rb JOIN blobs b ON b.digest = rb.digest WHERE rb.repo_id = ?`,
 		repo.ID).Scan(&size)
+	_ = a.DB.R.QueryRowContext(ctx, `SELECT pull_count FROM repositories WHERE id = ?`, repo.ID).Scan(&pulls)
 
 	readme, err := a.DB.RepoReadme(ctx, repo.ID)
 	if err != nil {
@@ -370,6 +374,7 @@ func (a *API) repo(w http.ResponseWriter, r *http.Request) {
 		"public":      repo.Public,
 		"createdAt":   repo.CreatedAt,
 		"size":        size,
+		"pulls":       pulls,
 		"description": description,
 		"source":      source,
 		"readme":      readme,
@@ -531,6 +536,7 @@ func (a *API) manifest(w http.ResponseWriter, r *http.Request) {
 		"raw":          json.RawMessage(m.Content),
 		"createdAt":    m.CreatedAt,
 		"lastPulledAt": m.LastPulledAt,
+		"pulls":        m.PullCount,
 		"subject":      m.Subject,
 		"annotations":  parsed.Annotations,
 		"summary":      a.summarize(all, &m),

@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { api, q } from '#lib/api.js';
-	import { bytes, plural, projectOf, refPath, shortDigest } from '#lib/format.js';
+	import { bytes, count, plural, projectOf, refPath, shortDigest } from '#lib/format.js';
 	import { hasProjectRole, repoCrumbs } from '#lib/session.svelte.js';
 	import { loadProjectRole } from '#lib/projectRole.js';
 	import { notify, fail } from '#lib/toast.svelte.js';
@@ -252,6 +252,9 @@
 			<Fact label="Tags" measure>{repo.tags.length}</Fact>
 			<Fact label="Untagged" measure>{repo.untagged.length}</Fact>
 			<Fact label="Stored" big><Readout value={bytes(repo.size)} /></Fact>
+			<Fact label="Pulls" measure
+				><span title={repo.pulls.toLocaleString()}>{count(repo.pulls)}</span></Fact
+			>
 			<Fact label="Created"><Time unix={repo.createdAt} /></Fact>
 		</Facts>
 	</div>
@@ -376,6 +379,7 @@
 					<th>Tag</th>
 					<th class="col-platforms">Platforms</th>
 					<th class="right">Size</th>
+					<th class="right col-pushed">Pulls</th>
 					<th class="col-pushed">Pushed</th>
 					<th class="shrink"><span class="visually-hidden">Actions</span></th>
 				</tr>
@@ -393,6 +397,9 @@
 						</td>
 						<td class="col-platforms"><Platforms m={t.manifest} /></td>
 						<td class="right muted nowrap">{bytes(t.manifest.size)}</td>
+						<td class="right muted nowrap col-pushed" title={t.manifest.pulls.toLocaleString()}
+							>{count(t.manifest.pulls)}</td
+						>
 						<td class="muted nowrap col-pushed"><Time unix={t.updatedAt} /></td>
 						<td class="shrink">
 							<span class="row-actions">

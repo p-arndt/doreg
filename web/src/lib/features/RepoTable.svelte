@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { bytes } from '#lib/format.js';
+	import { bytes, count } from '#lib/format.js';
 	import Table from '#lib/components/Table.svelte';
 	import Badge from '#lib/components/Badge.svelte';
 	import PullCopyButton from '#lib/components/PullCopyButton.svelte';
@@ -18,6 +18,7 @@
 			{#if showProject}<th class="col-project">Project</th>{/if}
 			<th class="right">Tags</th>
 			<th class="right">Size</th>
+			<th class="right col-pulls">Pulls</th>
 			<th class="col-push">Last push</th>
 			<th class="shrink"><span class="visually-hidden">Actions</span></th>
 		</tr>
@@ -41,6 +42,9 @@
 				{/if}
 				<td class="right muted">{r.tags}</td>
 				<td class="right muted nowrap">{bytes(r.size)}</td>
+				<td class="right muted nowrap col-pulls" title={r.pulls.toLocaleString()}
+					>{count(r.pulls)}</td
+				>
 				<td class="muted nowrap col-push"><Time unix={r.lastPush} /></td>
 				<td class="shrink">
 					<span class="row-actions"><PullCopyButton reference={`${host}/${r.name}`} /></span>
@@ -85,7 +89,8 @@
 	}
 
 	@media (max-width: 40rem) {
-		.col-push {
+		.col-push,
+		.col-pulls {
 			display: none;
 		}
 	}

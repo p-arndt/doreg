@@ -225,6 +225,7 @@
 			{#if builtAt}<Fact label="Built"><Time unix={builtAt} /></Fact>{/if}
 			<Fact label="Pushed"><Time unix={m.createdAt} /></Fact>
 			<Fact label="Last pulled"><Time unix={m.lastPulledAt} /></Fact>
+			<Fact label="Pulls" measure>{m.pulls.toLocaleString()}</Fact>
 			{#if m.tags.length}
 				<Fact label={m.tags.length === 1 ? 'Tag' : 'Tags'}>
 					{#each m.tags as t (t)}<a class="tag-link" href={refPath(repo, t)}><Badge>{t}</Badge></a

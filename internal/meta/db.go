@@ -35,6 +35,8 @@ type DB struct {
 	W        *sql.DB
 	R        *sql.DB
 	Postgres bool
+
+	pulls *pullCounter
 }
 
 // Open opens (and migrates) the database: a postgres:// or postgresql:// URL
@@ -62,7 +64,9 @@ func openPG(dsn string) (*DB, error) {
 		return nil, err
 	}
 	r.SetMaxOpenConns(8)
-	return &DB{W: w, R: r, Postgres: true}, nil
+	db := &DB{W: w, R: r, Postgres: true}
+	db.startPullFlusher()
+	return db, nil
 }
 
 func openSQLite(path string) (*DB, error) {
@@ -88,11 +92,14 @@ func openSQLite(path string) (*DB, error) {
 		return nil, err
 	}
 	r.SetMaxOpenConns(8)
-	return &DB{W: w, R: r}, nil
+	db := &DB{W: w, R: r}
+	db.startPullFlusher()
+	return db, nil
 }
 
-// Close closes both pools.
+// Close writes buffered pull counts and closes both pools.
 func (db *DB) Close() error {
+	db.stopPullFlusher()
 	return errors.Join(db.R.Close(), db.W.Close())
 }
 
