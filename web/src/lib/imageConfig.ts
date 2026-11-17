@@ -44,3 +44,36 @@ export function preferredImage<T extends { platform?: Platform }>(images: T[]): 
 		images[0]
 	);
 }
+
+/** The most recently pushed tag; on equal push times the later name in natural order wins. */
+export function latestTag<T extends { name: string; updatedAt: number }>(tags: T[]): T | undefined {
+	let best: T | undefined;
+	for (const t of tags) {
+		if (
+			!best ||
+			t.updatedAt > best.updatedAt ||
+			(t.updatedAt === best.updatedAt &&
+				t.name.localeCompare(best.name, undefined, { numeric: true }) > 0)
+		)
+			best = t;
+	}
+	return best;
+}
+
+const indexTypes = new Set([
+	'application/vnd.oci.image.index.v1+json',
+	'application/vnd.docker.distribution.manifest.list.v2+json'
+]);
+
+/**
+ * The manifest whose config describes a pushed image: the manifest itself, or for an index the
+ * platform image people most likely run. "" when there is none (e.g. an index of artifacts).
+ */
+export function configSource(m: {
+	digest: string;
+	mediaType: string;
+	platforms: (Platform & { digest: string })[];
+}): string {
+	if (!indexTypes.has(m.mediaType)) return m.digest;
+	return preferredImage(m.platforms.map((p) => ({ platform: p, digest: p.digest })))?.digest ?? '';
+}

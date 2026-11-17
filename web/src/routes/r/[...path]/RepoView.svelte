@@ -31,6 +31,8 @@
 	import SegmentedControl from '#lib/components/SegmentedControl.svelte';
 	import type { ProjectRole, Repo } from '#lib/types.js';
 	import { defaultView, isGitHubUrl, sourceLabel } from '#lib/readme.js';
+	import { latestTag } from '#lib/imageConfig.js';
+	import LatestPush from './LatestPush.svelte';
 
 	let { name }: { name: string } = $props();
 	let repo = $state<Repo | null>(null);
@@ -69,6 +71,8 @@
 			? repo.tags.filter((t) => !filter || t.name.toLowerCase().includes(filter.toLowerCase()))
 			: []
 	);
+
+	const latest = $derived(repo ? latestTag(repo.tags) : undefined);
 
 	const tabs = $derived([
 		...(showOverview ? [{ key: 'overview', label: 'Overview', href: '?view=overview' }] : []),
@@ -362,6 +366,7 @@
 			description="Everything here is untagged and will be removed by the next garbage collection."
 		/>
 	{:else}
+		{#if latest}<LatestPush repo={name} tag={latest} />{/if}
 		<div class="toolbar">
 			<Input
 				type="search"
