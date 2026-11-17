@@ -119,7 +119,7 @@ names without a slash in `library`.
 | `admin` | yes  | yes                             | yes                                            |
 
 - Members are local users or OIDC groups; a user gets the highest role they hold either way.
-- Public projects allow anonymous pulls; a single repository can be made public too. Quotas (bytes, set by system admins) reject pushes that would exceed them.
+- Public projects allow anonymous pulls (`docker pull` without `docker login`); a single repository can be made public too. The registry answers with a Bearer challenge and issues tokens at `/v2/token`, so behind a proxy it needs `X-Forwarded-Proto` and the original `Host`; Basic credentials sent directly keep working. Quotas (bytes, set by system admins) reject pushes that would exceed them.
 - With `DOREG_PUBLIC_BROWSE=true`, visitors who are not signed in see the public repositories in the web UI (list, tags, manifests) and a sign-in button. Everything else stays behind the login. It is off by default, because the list reveals repository names that anonymous pulls alone do not.
 - Every repository can have a Markdown README, written on its Overview tab by anyone with write access or imported once from GitHub (the importer rewrites relative links and images to GitHub). The repository page and list also show the image's `org.opencontainers.image.description` and link its `org.opencontainers.image.source`. README HTML is rendered on the server without raw HTML, so it is safe on public pages.
 - System admins can push anywhere, and a push to a new project creates it. Everyone else needs a membership.

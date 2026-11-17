@@ -133,8 +133,8 @@ func TestAuth(t *testing.T) {
 
 	resp := e.doAs("", "GET", "/v2/", nil, nil)
 	expect(t, resp, http.StatusUnauthorized)
-	if !strings.HasPrefix(resp.Header.Get("WWW-Authenticate"), "Basic") {
-		t.Fatal("missing Basic challenge")
+	if !strings.HasPrefix(resp.Header.Get("WWW-Authenticate"), "Bearer ") {
+		t.Fatal("missing Bearer challenge")
 	}
 	expect(t, e.doAs("", "GET", "/v2/app/manifests/v1", nil, nil), http.StatusUnauthorized)
 	expect(t, e.doAs("reader", "GET", "/v2/app/manifests/v1", nil, nil), http.StatusOK)

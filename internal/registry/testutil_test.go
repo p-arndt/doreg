@@ -25,6 +25,7 @@ type env struct {
 	srv   *httptest.Server
 	db    *meta.DB
 	store *storage.FS
+	auth  *auth.Authenticator
 }
 
 const testPassword = "secret-password"
@@ -45,10 +46,11 @@ func newEnv(t *testing.T) *env {
 	ctx := context.Background()
 	db.UpsertUser(ctx, "admin", hash, meta.RoleAdmin)
 	db.UpsertUser(ctx, "reader", hash, meta.RoleUser)
-	h := &registry.Handler{DB: db, Store: store, Auth: auth.New(db), Log: slog.New(slog.DiscardHandler)}
+	authn := auth.New(db)
+	h := &registry.Handler{DB: db, Store: store, Auth: authn, Log: slog.New(slog.DiscardHandler)}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &env{t: t, srv: srv, db: db, store: store}
+	return &env{t: t, srv: srv, db: db, store: store, auth: authn}
 }
 
 func (e *env) do(method, path string, body []byte, hdr map[string]string) *http.Response {

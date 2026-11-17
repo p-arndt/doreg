@@ -74,6 +74,9 @@ type Authenticator struct {
 	mu    sync.Mutex
 	cache map[[32]byte]cached
 
+	tokens map[[32]byte]issued
+	gen    uint64 // bumped by Invalidate; tokens of older generations are rechecked
+
 	// Limiter throttles failed credential checks of the UI login and registry
 	// Basic auth; both share it so a client cannot split guesses across them.
 	Limiter *Limiter
@@ -86,7 +89,7 @@ type cached struct {
 
 // New returns an Authenticator.
 func New(db *meta.DB) *Authenticator {
-	return &Authenticator{db: db, cache: map[[32]byte]cached{}, Limiter: NewLimiter()}
+	return &Authenticator{db: db, cache: map[[32]byte]cached{}, tokens: map[[32]byte]issued{}, Limiter: NewLimiter()}
 }
 
 // Allowed reports whether a credential check from ip for username may run.
@@ -207,10 +210,11 @@ func (a *Authenticator) Basic(ctx context.Context, username, secret string) (Pri
 }
 
 // Invalidate drops all cached credentials, e.g. after a password, secret or
-// role change.
+// role change, and makes issued tokens reload their principal.
 func (a *Authenticator) Invalidate() {
 	a.mu.Lock()
 	a.cache = map[[32]byte]cached{}
+	a.gen++
 	a.mu.Unlock()
 }
 

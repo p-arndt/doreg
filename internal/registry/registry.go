@@ -117,6 +117,10 @@ func parse(path string) (route, bool) {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Docker-Distribution-API-Version", "registry/2.0")
+	if r.URL.Path == tokenPath {
+		h.token(w, r)
+		return
+	}
 	rt, ok := parse(r.URL.Path)
 	if !ok {
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "unknown endpoint")
@@ -169,24 +173,24 @@ func actionFor(method string) auth.Action {
 }
 
 // authorize enforces access and stores the principal in the request context.
-// Unauthenticated requests always get 401 with a Basic challenge (never 403):
-// clients only send credentials after a challenge.
+// Unauthenticated requests always get 401 with a challenge (never 403):
+// clients only send credentials after one. Basic credentials are accepted on
+// every request; the challenge itself is Bearer (see tokenPath).
 func (h *Handler) authorize(w http.ResponseWriter, r *http.Request, rt route) (*http.Request, bool) {
 	p := auth.Anonymous
 	if tp, ok := r.Context().Value(inProcessKey{}).(auth.Principal); ok {
 		p = tp
 	} else if name, pw, ok := r.BasicAuth(); ok {
-		ip := clientIP(r)
-		if ok, wait := h.Auth.Allowed(ip, name); !ok {
-			w.Header().Set("Retry-After", auth.RetryAfter(wait))
-			writeError(w, http.StatusTooManyRequests, "TOOMANYREQUESTS", "too many failed authentication attempts")
+		var status int
+		if p, status = h.basic(w, r, name, pw); status == http.StatusUnauthorized {
+			return r, challenge(w, r, rt, "invalid_token")
+		} else if status != 0 {
 			return r, false
 		}
-		if p, ok = h.Auth.Basic(r.Context(), name, pw); !ok {
-			h.Auth.Failed(ip, name)
-			return r, challenge(w)
+	} else if tok, ok := bearerToken(r); ok {
+		if p, ok = h.Auth.Bearer(r.Context(), tok); !ok {
+			return r, challenge(w, r, rt, "invalid_token")
 		}
-		h.Auth.Succeeded(ip, name)
 	}
 	ctx := context.WithValue(r.Context(), principalKey{}, p)
 	if r.Header.Get(ImportHeader) != "" && p.IsAdmin() {
@@ -196,7 +200,7 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request, rt route) (*
 	if rt.name == "" {
 		// /v2/ and the catalog need an account; the catalog filters per project.
 		if p.Kind() == "anonymous" {
-			return r, challenge(w)
+			return r, challenge(w, r, rt, "")
 		}
 		return r, true
 	}
@@ -223,16 +227,10 @@ func (h *Handler) authorize(w http.ResponseWriter, r *http.Request, rt route) (*
 		return r, true
 	}
 	if p.Kind() == "anonymous" {
-		return r, challenge(w)
+		return r, challenge(w, r, rt, "insufficient_scope")
 	}
 	writeError(w, http.StatusForbidden, "DENIED", "requested access to the resource is denied")
 	return r, false
-}
-
-func challenge(w http.ResponseWriter) bool {
-	w.Header().Set("WWW-Authenticate", `Basic realm="doreg"`)
-	writeError(w, http.StatusUnauthorized, "UNAUTHORIZED", "authentication required")
-	return false
 }
 
 func writeError(w http.ResponseWriter, status int, code, msg string) {
