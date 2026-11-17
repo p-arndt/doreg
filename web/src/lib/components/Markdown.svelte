@@ -148,10 +148,43 @@
 		color: var(--fg-muted);
 	}
 
+	/* Inline, as on GitHub: badges sit side by side and align="center" centers them. The base reset makes images blocks. */
 	.markdown :global(img) {
+		display: inline-block;
 		max-width: 100%;
 		height: auto;
-		border-radius: var(--radius);
+		vertical-align: middle;
+	}
+
+	.markdown :global(a:has(> img)) {
+		text-decoration: none;
+	}
+
+	.markdown :global([align='center']) {
+		text-align: center;
+	}
+
+	.markdown :global([align='right']) {
+		text-align: right;
+	}
+
+	.markdown :global(img[align='right']) {
+		float: right;
+		margin: 0 0 var(--space-3) var(--space-3);
+	}
+
+	.markdown :global(img[align='left']) {
+		float: left;
+		margin: 0 var(--space-3) var(--space-3) 0;
+	}
+
+	.markdown :global(details) {
+		margin: 0 0 var(--space-3);
+	}
+
+	.markdown :global(summary) {
+		cursor: pointer;
+		font-weight: 500;
 	}
 
 	.markdown :global(hr) {

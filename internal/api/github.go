@@ -237,7 +237,13 @@ func githubURL(target string, image bool, owner, repo string) string {
 		p = strings.TrimLeft(p[2:], "/")
 	}
 	if image {
-		return "https://raw.githubusercontent.com/" + owner + "/" + repo + "/HEAD/" + p
+		u := "https://raw.githubusercontent.com/" + owner + "/" + repo + "/HEAD/" + p
+		// raw.githubusercontent.com serves SVG as text/plain, which browsers
+		// refuse in <img>; sanitize=true makes it answer image/svg+xml.
+		if strings.HasSuffix(strings.ToLower(p), ".svg") {
+			u += "?sanitize=true"
+		}
+		return u
 	}
 	return "https://github.com/" + owner + "/" + repo + "/blob/HEAD/" + p
 }

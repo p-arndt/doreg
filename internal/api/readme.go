@@ -5,11 +5,18 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
+	"unicode"
 
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/util"
 
 	"github.com/p-arndt/doreg/internal/auth"
 	"github.com/p-arndt/doreg/internal/meta"
@@ -27,13 +34,27 @@ const (
 	labelSource      = "org.opencontainers.image.source"
 )
 
-// markdown leaves raw HTML out of the output (no html.WithUnsafe) and goldmark
-// drops javascript: and other dangerous link targets, because anonymous
-// visitors read these pages.
+// markdown keeps raw HTML because READMEs written for GitHub rely on it
+// (centered headers, sized logos); readmePolicy then strips everything that
+// could run script, since anonymous visitors read these pages.
 var markdown = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
 	goldmark.WithParserOptions(parser.WithAutoHeadingID()),
+	goldmark.WithRendererOptions(html.WithUnsafe()),
 )
+
+// readmePolicy is roughly what GitHub lets through in READMEs: user-generated
+// content markup, alignment, and heading ids so in-page links resolve.
+var readmePolicy = func() *bluemonday.Policy {
+	p := bluemonday.UGCPolicy()
+	p.AllowAttrs("align").Matching(regexp.MustCompile(`(?i)^(left|center|right)$`)).
+		OnElements("div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "img", "td", "th")
+	p.AllowAttrs("id").Matching(regexp.MustCompile(`^[\p{L}\p{M}\p{N}_-]+$`)).
+		OnElements("h1", "h2", "h3", "h4", "h5", "h6")
+	p.AllowElements("details", "summary", "picture")
+	p.AllowAttrs("open").OnElements("details")
+	return p
+}()
 
 // renderMarkdown turns README Markdown into HTML that is safe to show to
 // anonymous visitors.
@@ -42,10 +63,43 @@ func renderMarkdown(src string) string {
 		return ""
 	}
 	var buf bytes.Buffer
-	if err := markdown.Convert([]byte(src), &buf); err != nil {
+	ctx := parser.NewContext(parser.WithIDs(&githubIDs{seen: map[string]int{}}))
+	if err := markdown.Convert([]byte(src), &buf, parser.WithContext(ctx)); err != nil {
 		return ""
 	}
-	return buf.String()
+	return readmePolicy.Sanitize(buf.String())
+}
+
+// githubIDs generates heading ids the way GitHub does, so links such as
+// [Quick start](#-quick-start) written against GitHub keep working.
+type githubIDs struct {
+	seen map[string]int
+}
+
+func (g *githubIDs) Generate(value []byte, _ ast.NodeKind) []byte {
+	var b strings.Builder
+	for _, r := range strings.ToLower(string(value)) {
+		switch {
+		case r == ' ':
+			b.WriteByte('-')
+		case r == '-' || r == '_' || unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.IsMark(r):
+			b.WriteRune(r)
+		}
+	}
+	id := b.String()
+	if id == "" {
+		id = "section"
+	}
+	n := g.seen[id]
+	g.seen[id] = n + 1
+	if n > 0 {
+		id += "-" + strconv.Itoa(n)
+	}
+	return []byte(id)
+}
+
+func (g *githubIDs) Put(value []byte) {
+	g.seen[util.BytesToReadOnlyString(value)]++
 }
 
 // repoLabels returns the description and source URL of the repository's most

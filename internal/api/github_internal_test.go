@@ -58,7 +58,8 @@ func TestRewriteRelativeLinks(t *testing.T) {
 		"[proto](//cdn.example.com/x.js)\n" +
 		"<img src=\"img/c.png\" alt=\"c\">\n" +
 		"<a href=\"CONTRIBUTING.md\">contributing</a>\n" +
-		"<img src=\"https://example.com/d.png\">\n"
+		"<img src=\"https://example.com/d.png\">\n" +
+		"<img src=\"assets/Logo.SVG\" width=\"104\">\n"
 	want := "![logo](https://raw.githubusercontent.com/acme/tool/HEAD/docs/logo.png)\n" +
 		"![dot](https://raw.githubusercontent.com/acme/tool/HEAD/img/a.png \"Title\")\n" +
 		"![slash](https://raw.githubusercontent.com/acme/tool/HEAD/img/b.png)\n" +
@@ -69,7 +70,8 @@ func TestRewriteRelativeLinks(t *testing.T) {
 		"[proto](//cdn.example.com/x.js)\n" +
 		"<img src=\"https://raw.githubusercontent.com/acme/tool/HEAD/img/c.png\" alt=\"c\">\n" +
 		"<a href=\"https://github.com/acme/tool/blob/HEAD/CONTRIBUTING.md\">contributing</a>\n" +
-		"<img src=\"https://example.com/d.png\">\n"
+		"<img src=\"https://example.com/d.png\">\n" +
+		"<img src=\"https://raw.githubusercontent.com/acme/tool/HEAD/assets/Logo.SVG?sanitize=true\" width=\"104\">\n"
 	if got := rewriteRelativeLinks(in, "acme", "tool"); got != want {
 		t.Errorf("rewriteRelativeLinks mismatch\n got: %s\nwant: %s", got, want)
 	}
