@@ -531,7 +531,7 @@
 	}
 
 	.pull-cmd {
-		width: min(24rem, 100%);
+		width: min(30rem, 100%);
 	}
 
 	.source {

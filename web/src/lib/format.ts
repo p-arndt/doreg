@@ -182,6 +182,15 @@ export function pullText(ref: string, mode: CopyMode, platform?: string): string
 	return platform ? `docker pull --platform ${platform} ${ref}` : `docker pull ${ref}`;
 }
 
+/**
+ * An image reference split before its last path segment, so a cramped display can cut the
+ * host and namespace and keep "name:tag" readable. Tags and digests never contain a slash.
+ */
+export function splitReference(ref: string): { head: string; tail: string } {
+	const slash = ref.lastIndexOf('/');
+	return { head: ref.slice(0, slash + 1), tail: ref.slice(slash + 1) };
+}
+
 /** The project a repository belongs to: its first path segment, "library" without one. */
 export function projectOf(repo: string): string {
 	const slash = repo.indexOf('/');

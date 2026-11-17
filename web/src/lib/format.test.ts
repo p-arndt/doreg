@@ -14,6 +14,7 @@ import {
 	parseRef,
 	projectOf,
 	pullText,
+	splitReference,
 	shellQuote,
 	actionLabel,
 	dateToUnix,
@@ -131,6 +132,22 @@ describe('pullText', () => {
 		expect(pullText(ref, 'command', 'linux/arm64')).toBe(
 			`docker pull --platform linux/arm64 ${ref}`
 		);
+	});
+});
+
+describe('splitReference', () => {
+	it('splits before the last path segment', () => {
+		expect(splitReference('reg.example.com/team/api:1.0')).toEqual({
+			head: 'reg.example.com/team/',
+			tail: 'api:1.0'
+		});
+		expect(splitReference('reg.example.com/team/api@sha256:abc')).toEqual({
+			head: 'reg.example.com/team/',
+			tail: 'api@sha256:abc'
+		});
+	});
+	it('keeps a reference without a slash whole', () => {
+		expect(splitReference('api:1.0')).toEqual({ head: '', tail: 'api:1.0' });
 	});
 });
 
