@@ -560,6 +560,14 @@
 		justify-content: flex-end;
 	}
 
+	/* The README is a reading column narrower than the page: it sits in the middle, so a
+	   README that centers its header (align="center") is centered on the page, not off to
+	   the left. */
+	.overview > :global(.markdown) {
+		width: 100%;
+		margin-inline: auto;
+	}
+
 	.editor {
 		display: grid;
 		gap: var(--space-3);

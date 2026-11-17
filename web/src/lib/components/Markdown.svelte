@@ -16,6 +16,12 @@
 		overflow-wrap: break-word;
 	}
 
+	/* The block itself sets the measure. The base caps on p and headings would make centered
+	   READMEs center each element in a different column. */
+	.markdown :global(:is(p, h1, h2, h3, h4, h5, h6)) {
+		max-width: none;
+	}
+
 	.markdown :global(p),
 	.markdown :global(ul),
 	.markdown :global(ol),
