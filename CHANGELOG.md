@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 - 2026-11-17
+
+### Added
+
+- Multi-platform image indexes show a Configuration tab with a platform switch, so the config is one click away instead of behind the platform image
+
+### Fixed
+
+- Anonymous docker pull of public repositories: the registry now issues Bearer tokens at /v2/token instead of a Basic challenge, which made Docker fail with no basic auth credentials
+- READMEs imported from GitHub render like on GitHub: centered headers, logos and screenshots, inline badges, SVG images and working in-page links
+
 ## 0.2.0 - 2026-11-17
 
 ### Added
