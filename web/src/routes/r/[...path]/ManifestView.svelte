@@ -5,8 +5,6 @@
 	import {
 		bytes,
 		fraction,
-		healthcheckCommand,
-		healthcheckTiming,
 		historyCommand,
 		mediaTypeLabel,
 		platform,
@@ -29,6 +27,10 @@
 	import CopyButton from '#lib/components/CopyButton.svelte';
 	import ConfirmButton from '#lib/components/ConfirmButton.svelte';
 	import DescriptionList from '#lib/components/DescriptionList.svelte';
+	import ImageConfigView from '#lib/components/ImageConfigView.svelte';
+	import Select from '#lib/components/Select.svelte';
+	import SegmentedControl from '#lib/components/SegmentedControl.svelte';
+	import { preferredImage } from '#lib/imageConfig.js';
 	import EmptyState from '#lib/components/EmptyState.svelte';
 	import ErrorState from '#lib/components/ErrorState.svelte';
 	import Skeleton from '#lib/components/Skeleton.svelte';
@@ -76,7 +78,6 @@
 		});
 		active = biggest;
 	});
-	const cfg = $derived(m?.config?.config);
 	const builtAt = $derived(
 		m?.summary.created ? Math.floor(Date.parse(m.summary.created) / 1000) : 0
 	);
@@ -93,34 +94,33 @@
 
 	const layerCommands = $derived(history.filter((h) => h.layer).map((h) => h.command));
 
-	const configItems = $derived.by((): [string, string][] => {
-		if (!m?.config) return [];
-		const items: [string, string][] = [['Platform', platform(m.config)]];
-		if (cfg?.Entrypoint) items.push(['Entrypoint', JSON.stringify(cfg.Entrypoint)]);
-		if (cfg?.Cmd) items.push(['Command', JSON.stringify(cfg.Cmd)]);
-		if (cfg?.WorkingDir) items.push(['Working dir', cfg.WorkingDir]);
-		if (cfg?.User) items.push(['User', cfg.User]);
-		if (cfg?.ExposedPorts) items.push(['Ports', Object.keys(cfg.ExposedPorts).join(', ')]);
-		if (cfg?.Volumes) items.push(['Volumes', Object.keys(cfg.Volumes).join(', ')]);
-		if (cfg?.StopSignal) items.push(['Stop signal', cfg.StopSignal]);
-		const check = healthcheckCommand(cfg?.Healthcheck?.Test);
-		if (check) {
-			items.push(['Healthcheck', check]);
-			const timing = check === 'disabled' ? '' : healthcheckTiming(cfg!.Healthcheck!);
-			if (timing) items.push(['Health timing', timing]);
-		}
-		if (cfg?.Shell) items.push(['Shell', JSON.stringify(cfg.Shell)]);
-		if (cfg?.OnBuild?.length) items.push(['On build', cfg.OnBuild.join(' · ')]);
-		if (m.config.author) items.push(['Author', m.config.author]);
-		return items;
-	});
-	const env = $derived(
-		(cfg?.Env ?? []).map((e): [string, string] => {
-			const i = e.indexOf('=');
-			return i < 0 ? [e, ''] : [e.slice(0, i), e.slice(i + 1)];
-		})
+	// An index has no config of its own; its Configuration tab shows one platform's image,
+	// loaded on demand so opening a tag does not cost a second request.
+	let pickedImage = $state('');
+	const shownImage = $derived(
+		images.find((i) => i.digest === pickedImage)?.digest ?? preferredImage(images)?.digest ?? ''
 	);
-	const labels = $derived(Object.entries(cfg?.Labels ?? {}));
+	let child = $state<{ digest: string; detail: ManifestDetail | null; error: unknown } | null>(
+		null
+	);
+	async function loadChild(digest: string) {
+		child = { digest, detail: null, error: null };
+		try {
+			const detail = await api.get<ManifestDetail>(
+				`/api/manifest?repo=${q(repo)}&ref=${q(digest)}`
+			);
+			if (child?.digest === digest) child = { digest, detail, error: null };
+		} catch (e) {
+			if (child?.digest === digest) child = { digest, detail: null, error: e };
+		}
+	}
+	$effect(() => {
+		if (tab === 'config' && isIndex && shownImage && child?.digest !== shownImage)
+			loadChild(shownImage);
+	});
+	const imageOptions = $derived(
+		images.map((i) => ({ value: i.digest, label: platform(i.platform) }))
+	);
 
 	function attestationTarget(digest: string): string {
 		const raw = m?.raw as {
@@ -136,7 +136,10 @@
 	const tabs = $derived.by(() => {
 		if (!m) return [];
 		const t = isIndex
-			? [{ key: 'platforms', label: 'Platforms', href: '?tab=platforms', count: images.length }]
+			? [
+					{ key: 'platforms', label: 'Platforms', href: '?tab=platforms', count: images.length },
+					...(images.length ? [{ key: 'config', label: 'Configuration', href: '?tab=config' }] : [])
+				]
 			: [
 					{ key: 'layers', label: 'Layers', href: '?tab=layers', count: layers.length },
 					...(m.config || m.artifactType
@@ -371,21 +374,43 @@
 				</tbody>
 			</Table>
 		{/if}
+	{:else if tab === 'config' && isIndex}
+		{#if images.length > 1}
+			<div class="image-pick">
+				{#if images.length <= 4}
+					<SegmentedControl
+						label="Platform"
+						value={shownImage}
+						options={imageOptions}
+						onchange={(d) => (pickedImage = d)}
+					/>
+				{:else}
+					<Select
+						aria-label="Platform"
+						value={shownImage}
+						options={imageOptions}
+						onchange={(d) => (pickedImage = d)}
+					/>
+				{/if}
+				<a class="muted" href={refPath(repo, shownImage)}>Open image</a>
+			</div>
+		{/if}
+		{#if child?.error}
+			<ErrorState error={child.error} retry={() => loadChild(shownImage)} />
+		{:else if !child?.detail}
+			<Skeleton rows={6} columns={[1, 3]} />
+		{:else if child.detail.config}
+			<ImageConfigView config={child.detail.config} />
+		{:else}
+			<EmptyState
+				icon="layers"
+				title="No configuration"
+				description="This image has no readable config."
+			/>
+		{/if}
 	{:else if tab === 'config'}
 		{#if m.config}
-			<Section title="Runtime">
-				<DescriptionList items={configItems} mono />
-			</Section>
-			{#if env.length}
-				<Section title="Environment">
-					<DescriptionList items={env} mono monoKeys />
-				</Section>
-			{/if}
-			{#if labels.length}
-				<Section title="Labels">
-					<DescriptionList items={labels} mono monoKeys />
-				</Section>
-			{/if}
+			<ImageConfigView config={m.config} />
 		{:else if m.artifactType}
 			<Section title="Artifact">
 				<DescriptionList items={[['Type', m.artifactType]]} mono />
@@ -457,6 +482,15 @@
 
 	.summary > :global(.pull) {
 		max-width: 36rem;
+	}
+
+	.image-pick {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: var(--space-3);
+		margin-bottom: var(--space-5);
+		font-size: var(--text-sm);
 	}
 
 	.tag-link:hover {
