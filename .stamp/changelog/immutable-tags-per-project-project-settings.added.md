@@ -1,1 +1,1 @@
-Immutable tags: per project (project settings) or for every project (DOREG_IMMUTABLE_TAGS=true), pushes that would point an existing tag at a different manifest are rejected
+Immutable tags: per project (project settings) or for every project (DOREG_IMMUTABLE_TAGS=true), pushes that would point an existing tag at a different manifest are rejected; exception patterns such as latest or *-dev keep single tags overwritable (DOREG_MUTABLE_TAGS server-wide)

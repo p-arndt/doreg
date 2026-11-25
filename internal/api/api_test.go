@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -287,6 +288,18 @@ func TestAPIProjectMembers(t *testing.T) {
 	apitDecode(t, e.admin.expect(http.StatusOK, http.MethodGet, "/api/projects/team", nil), &locked)
 	if !locked.Project.ImmutableTags || locked.Project.QuotaBytes != 1000 {
 		t.Errorf("after immutableTags PATCH: %+v, want immutable with quota 1000", locked.Project)
+	}
+	bob.expect(http.StatusBadRequest, http.MethodPatch, "/api/projects/team", map[string]any{"mutableTags": []string{"[bad"}})
+	bob.expect(http.StatusOK, http.MethodPatch, "/api/projects/team", map[string]any{"mutableTags": []string{" latest ", "*-dev", "latest", ""}})
+	var exceptions struct {
+		Project struct {
+			ImmutableTags bool     `json:"immutableTags"`
+			MutableTags   []string `json:"mutableTags"`
+		} `json:"project"`
+	}
+	apitDecode(t, e.admin.expect(http.StatusOK, http.MethodGet, "/api/projects/team", nil), &exceptions)
+	if !exceptions.Project.ImmutableTags || strings.Join(exceptions.Project.MutableTags, ",") != "latest,*-dev" {
+		t.Errorf("after mutableTags PATCH: %+v", exceptions.Project)
 	}
 	carol.expect(http.StatusForbidden, http.MethodPatch, "/api/projects/team", map[string]any{"public": false})
 

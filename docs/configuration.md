@@ -15,6 +15,7 @@ A minimal production setup needs `DOREG_ADMIN_PASSWORD` (or SSO) and a TLS-termi
 | `DOREG_ADMIN_USER` | `admin` | With `DOREG_ADMIN_PASSWORD`: the admin created on start if no users exist. |
 | `DOREG_ADMIN_PASSWORD` | | Password of that admin. Optional with SSO, see [who becomes admin](access.md#who-becomes-admin). |
 | `DOREG_IMMUTABLE_TAGS` | `false` | Make tags immutable in every project, whatever the project setting says. See [immutable tags](access.md#immutable-tags). |
+| `DOREG_MUTABLE_TAGS` | | With `DOREG_IMMUTABLE_TAGS`: comma-separated tag patterns that stay overwritable everywhere, e.g. `latest,nightly-*`. |
 | `DOREG_PUBLIC_BROWSE` | `false` | Show public repositories in the web UI without signing in. See [public repositories](access.md#public-repositories). |
 | `DOREG_WEBHOOK_ALLOW_PRIVATE` | `false` | Allow webhook URLs on private, loopback and link-local networks. See [webhooks](webhooks.md). |
 | `DOREG_GITHUB_TOKEN` | | GitHub token for README imports: lifts the anonymous rate limit and reaches private repositories (read-only `contents` scope is enough). |

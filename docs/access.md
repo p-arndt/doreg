@@ -37,12 +37,18 @@ stays private. Project admins set both flags.
 
 With **Immutable tags** on in a project's settings, a push that would point an existing tag at a
 different manifest is rejected with `403 DENIED` (`docker push` prints `denied: tag v1 exists and is
-immutable …`). `DOREG_IMMUTABLE_TAGS=true` turns this on for every project; the project setting is
-then shown as locked.
+immutable …`).
+
+**Exceptions** keep single tags overwritable: a comma-separated list of tag patterns in the same
+settings, where `*` and `?` are wildcards (`latest, *-dev, nightly-*`).
+
+`DOREG_IMMUTABLE_TAGS=true` turns immutability on for every project, with its own exceptions in
+`DOREG_MUTABLE_TAGS`. A tag is overwritable only if neither the server nor the project locks it:
+project exceptions do not lift the server-wide setting.
 
 - New tags, pushes by digest and re-pushing the image a tag already points at keep working.
 - Deleting a tag still works for anyone with delete permission (project `write`/`admin`, robots with delete); a deleted tag can be pushed again. Leave delete off for CI robots that should only add tags.
-- Moving tags like `latest` fails too, so use versioned tags in immutable projects.
+- Tags like `latest` need an exception if they should keep moving.
 - An [import](migrating.md) into an immutable project reports a tag that already exists there with a different image as failed and copies the rest.
 
 ## Repository READMEs

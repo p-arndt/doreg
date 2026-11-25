@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/p-arndt/doreg/internal/auth"
 	"github.com/p-arndt/doreg/internal/meta"
@@ -15,8 +17,10 @@ type projectItem struct {
 	Repositories int    `json:"repositories"`
 	UsedBytes    int64  `json:"usedBytes"`
 	// ImmutableTagsGlobal is set when DOREG_IMMUTABLE_TAGS makes tags
-	// immutable in every project, whatever the project setting says.
-	ImmutableTagsGlobal bool `json:"immutableTagsGlobal"`
+	// immutable in every project, whatever the project setting says;
+	// MutableTagsGlobal are the exceptions from DOREG_MUTABLE_TAGS.
+	ImmutableTagsGlobal bool     `json:"immutableTagsGlobal"`
+	MutableTagsGlobal   []string `json:"mutableTagsGlobal"`
 }
 
 func (a *API) projectItem(r *http.Request, p meta.Project) (projectItem, error) {
@@ -25,7 +29,11 @@ func (a *API) projectItem(r *http.Request, p meta.Project) (projectItem, error) 
 	if err != nil {
 		return projectItem{}, err
 	}
-	it := projectItem{Project: p, Role: role, ImmutableTagsGlobal: a.Registry != nil && a.Registry.ImmutableTags}
+	it := projectItem{Project: p, Role: role, MutableTagsGlobal: []string{}}
+	if a.Registry != nil && a.Registry.ImmutableTags {
+		it.ImmutableTagsGlobal = true
+		it.MutableTagsGlobal = append(it.MutableTagsGlobal, a.Registry.MutableTags...)
+	}
 	if it.Repositories, err = a.DB.ProjectRepoCount(r.Context(), p.Name); err != nil {
 		return it, err
 	}
@@ -61,6 +69,30 @@ type projectBody struct {
 	Public        *bool  `json:"public"`
 	QuotaBytes    *int64 `json:"quotaBytes"`
 	ImmutableTags *bool  `json:"immutableTags"`
+	// MutableTags replaces the exception patterns; nil leaves them unchanged.
+	MutableTags *[]string `json:"mutableTags"`
+}
+
+// applyTagSettings copies the immutability fields of the body onto p and
+// reports false (after writing the error) for invalid patterns.
+func applyTagSettings(w http.ResponseWriter, b projectBody, p *meta.Project) bool {
+	if b.ImmutableTags != nil {
+		p.ImmutableTags = *b.ImmutableTags
+	}
+	if b.MutableTags != nil {
+		patterns := []string{}
+		for _, s := range *b.MutableTags {
+			if s = strings.TrimSpace(s); s != "" && !slices.Contains(patterns, s) {
+				patterns = append(patterns, s)
+			}
+		}
+		if !meta.ValidTagPatterns(patterns) {
+			writeErr(w, http.StatusBadRequest, "tag patterns use tag characters with * ? and [...] wildcards")
+			return false
+		}
+		p.MutableTags = patterns
+	}
+	return true
 }
 
 func (a *API) createProject(w http.ResponseWriter, r *http.Request) {
@@ -79,8 +111,8 @@ func (a *API) createProject(w http.ResponseWriter, r *http.Request) {
 	if b.QuotaBytes != nil && *b.QuotaBytes > 0 {
 		p.QuotaBytes = *b.QuotaBytes
 	}
-	if b.ImmutableTags != nil {
-		p.ImmutableTags = *b.ImmutableTags
+	if !applyTagSettings(w, b, &p) {
+		return
 	}
 	p, err := a.DB.CreateProject(r.Context(), p)
 	if errors.Is(err, meta.ErrExists) {
@@ -148,14 +180,15 @@ func (a *API) updateProject(w http.ResponseWriter, r *http.Request) {
 		}
 		p.QuotaBytes = max(0, *b.QuotaBytes)
 	}
-	if b.ImmutableTags != nil {
-		p.ImmutableTags = *b.ImmutableTags
+	if !applyTagSettings(w, b, &p) {
+		return
 	}
 	if err := a.DB.UpdateProject(r.Context(), p); err != nil {
 		a.fail(w, r, err)
 		return
 	}
-	a.record(r, "project_update", p.Name, p.Name, fmt.Sprintf("public=%t quota=%d immutable_tags=%t", p.Public, p.QuotaBytes, p.ImmutableTags))
+	a.record(r, "project_update", p.Name, p.Name, fmt.Sprintf("public=%t quota=%d immutable_tags=%t mutable_tags=%s",
+		p.Public, p.QuotaBytes, p.ImmutableTags, strings.Join(p.MutableTags, ",")))
 	writeJSON(w, http.StatusOK, p)
 }
 

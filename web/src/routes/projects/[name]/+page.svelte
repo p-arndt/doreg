@@ -34,6 +34,8 @@
 	let error = $state<unknown>(null);
 	let reposError = $state<unknown>(null);
 	let quotaGb = $state('');
+	let mutableTags = $state('');
+	let savingMutable = $state(false);
 	let savingQuota = $state(false);
 	let confirmName = $state('');
 	let deleting = $state(false);
@@ -45,6 +47,7 @@
 		try {
 			detail = await api.get<ProjectDetail>(`/api/projects/${q(name)}`);
 			quotaGb = detail.project.quotaBytes ? String(detail.project.quotaBytes / 1e9) : '';
+			mutableTags = detail.project.mutableTags.join(', ');
 		} catch (e) {
 			error = e;
 		}
@@ -115,6 +118,22 @@
 			await load();
 		} catch (e) {
 			fail(e);
+		}
+	}
+
+	async function saveMutableTags(e: SubmitEvent) {
+		e.preventDefault();
+		savingMutable = true;
+		try {
+			await api.patch(`/api/projects/${q(name)}`, {
+				mutableTags: mutableTags.split(',').map((t) => t.trim())
+			});
+			notify('Exceptions saved.');
+			await load();
+		} catch (err) {
+			fail(err);
+		} finally {
+			savingMutable = false;
 		}
 	}
 
@@ -217,17 +236,27 @@
 			<Section
 				title="Tags"
 				description={p.immutableTagsGlobal
-					? 'Tags are immutable in every project (set by the server configuration).'
+					? `The server makes tags immutable in every project${p.mutableTagsGlobal.length ? ` except ${p.mutableTagsGlobal.join(', ')}` : ''}; exceptions here do not lift that.`
 					: undefined}
 			>
-				<div class="card">
+				<div class="card tags">
 					<Checkbox
 						label="Immutable tags"
 						description="Pushing a different image to an existing tag is rejected. New tags and re-pushing the same image still work; deleting a tag needs delete permission."
-						checked={p.immutableTags || p.immutableTagsGlobal}
-						disabled={p.immutableTagsGlobal}
+						checked={p.immutableTags}
 						onchange={(e) => setImmutableTags(e.currentTarget.checked)}
 					/>
+					{#if p.immutableTags}
+						<form class="quota" onsubmit={saveMutableTags}>
+							<Field
+								label="Exceptions"
+								hint="Comma-separated tags that stay overwritable; * and ? are wildcards, e.g. latest, *-dev."
+							>
+								<Input bind:value={mutableTags} placeholder="latest, *-dev" />
+							</Field>
+							<Button type="submit" loading={savingMutable}>Save exceptions</Button>
+						</form>
+					{/if}
 				</div>
 			</Section>
 
@@ -315,6 +344,13 @@
 
 	.quota :global(.field) {
 		flex: 0 1 14rem;
+	}
+	.tags {
+		display: grid;
+		gap: var(--space-4);
+	}
+	.tags .quota :global(.field) {
+		flex: 1 1 18rem;
 	}
 
 	.card--danger {

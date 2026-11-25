@@ -76,3 +76,28 @@ func TestImmutableTagsGlobal(t *testing.T) {
 	expect(t, e.putTag("team/app", "v1", e.imageManifest("team/app", "b")), http.StatusForbidden)
 	expect(t, e.putTag("plain", "latest", e.imageManifest("plain", "b")), http.StatusForbidden)
 }
+
+func TestImmutableTagsExceptions(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	if _, err := e.db.CreateProject(ctx, meta.Project{Name: "locked", ImmutableTags: true,
+		MutableTags: []string{"latest", "*-dev"}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tag := range []string{"latest", "feature-dev", "v1"} {
+		e.pushImage("locked/app", tag, "a")
+	}
+	other := e.imageManifest("locked/app", "b")
+	expect(t, e.putTag("locked/app", "latest", other), http.StatusCreated)
+	expect(t, e.putTag("locked/app", "feature-dev", other), http.StatusCreated)
+	expect(t, e.putTag("locked/app", "v1", other), http.StatusForbidden)
+
+	// Server-wide immutability has its own exceptions; project exceptions do
+	// not lift it.
+	e.h.ImmutableTags, e.h.MutableTags = true, []string{"nightly"}
+	e.pushImage("team/app", "nightly", "a")
+	e.pushImage("team/app", "v1", "a")
+	expect(t, e.putTag("team/app", "nightly", e.imageManifest("team/app", "b")), http.StatusCreated)
+	expect(t, e.putTag("team/app", "v1", e.imageManifest("team/app", "b")), http.StatusForbidden)
+	expect(t, e.putTag("locked/app", "latest", e.imageManifest("locked/app", "c")), http.StatusForbidden)
+}

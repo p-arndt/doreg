@@ -233,8 +233,12 @@ export interface Project {
 	quotaBytes: number;
 	/** Pushes may not move an existing tag to another manifest. */
 	immutableTags: boolean;
-	/** DOREG_IMMUTABLE_TAGS locks tags in every project, overriding immutableTags. */
+	/** Glob patterns of tags that stay movable while immutableTags is on. */
+	mutableTags: string[];
+	/** DOREG_IMMUTABLE_TAGS locks tags in every project, whatever immutableTags says. */
 	immutableTagsGlobal: boolean;
+	/** Exceptions to immutableTagsGlobal (DOREG_MUTABLE_TAGS). */
+	mutableTagsGlobal: string[];
 	createdAt: number;
 	/** The caller's effective role. */
 	role: ProjectRole;

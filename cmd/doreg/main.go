@@ -150,6 +150,12 @@ func serve(args []string) error {
 	mux := http.NewServeMux()
 	reg := &registry.Handler{DB: a.db, Store: a.store, Auth: authn, Events: bus, Log: a.log,
 		ImmutableTags: os.Getenv("DOREG_IMMUTABLE_TAGS") == "true"}
+	if v := os.Getenv("DOREG_MUTABLE_TAGS"); v != "" {
+		reg.MutableTags = strings.Split(strings.ReplaceAll(v, " ", ""), ",")
+		if !meta.ValidTagPatterns(reg.MutableTags) {
+			return fmt.Errorf("DOREG_MUTABLE_TAGS: invalid tag pattern in %q", v)
+		}
+	}
 	mux.Handle("/v2/", reg)
 	mux.Handle("/v2", http.RedirectHandler("/v2/", http.StatusMovedPermanently))
 	apiHandler := api.New(a.db, a.store, authn, collector, bus, provider, a.log)
