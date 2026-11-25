@@ -14,6 +14,7 @@ A minimal production setup needs `DOREG_ADMIN_PASSWORD` (or SSO) and a TLS-termi
 | `DOREG_DATA` | `./data` (`/data` in the image) | Data directory: SQLite metadata, upload sessions and, without S3, the blobs. Also `--data`. |
 | `DOREG_ADMIN_USER` | `admin` | With `DOREG_ADMIN_PASSWORD`: the admin created on start if no users exist. |
 | `DOREG_ADMIN_PASSWORD` | | Password of that admin. Optional with SSO, see [who becomes admin](access.md#who-becomes-admin). |
+| `DOREG_IMMUTABLE_TAGS` | `false` | Make tags immutable in every project, whatever the project setting says. See [immutable tags](access.md#immutable-tags). |
 | `DOREG_PUBLIC_BROWSE` | `false` | Show public repositories in the web UI without signing in. See [public repositories](access.md#public-repositories). |
 | `DOREG_WEBHOOK_ALLOW_PRIVATE` | `false` | Allow webhook URLs on private, loopback and link-local networks. See [webhooks](webhooks.md). |
 | `DOREG_GITHUB_TOKEN` | | GitHub token for README imports: lifts the anonymous rate limit and reaches private repositories (read-only `contents` scope is enough). |
@@ -66,7 +67,7 @@ Read only by the [`doreg import`](migrating.md#from-the-cli) command, not by the
 
 | Setting | Where | Who |
 |---------|-------|-----|
-| Projects, members, public flag, quota | Projects | system admins; members and public flag also project admins |
+| Projects, members, public flag, immutable tags, quota | Projects | system admins; all but the quota also project admins |
 | Public flag of a single repository | repository settings | project admins |
 | Robot accounts | project page or Robots | project admins, system admins for system robots |
 | Webhooks | project page or Webhooks | project admins, system admins for global webhooks |

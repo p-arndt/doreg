@@ -14,7 +14,7 @@ func TestAPIPullCounts(t *testing.T) {
 	const d = "sha256:ab"
 	if err := e.db.PutManifest(ctx, "app", meta.Manifest{Digest: d,
 		MediaType: "application/vnd.oci.image.index.v1+json",
-		Content:   []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}`)}, nil, "v1"); err != nil {
+		Content:   []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}`)}, nil, "v1", false); err != nil {
 		t.Fatal(err)
 	}
 	m, err := e.db.GetManifest(ctx, "app", "v1", false)

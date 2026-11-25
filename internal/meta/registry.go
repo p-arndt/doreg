@@ -176,8 +176,10 @@ func (e *ErrMissingRef) Error() string {
 
 // PutManifest stores a manifest and optionally points a tag at it. Reference
 // checks run inside the write transaction, so GC (which also takes the single
-// writer) can never remove a referenced blob between check and insert.
-func (db *DB) PutManifest(ctx context.Context, repo string, m Manifest, refs []Ref, tag string) error {
+// writer) can never remove a referenced blob between check and insert. With
+// immutable set, moving an existing tag to another manifest fails with
+// ErrTagImmutable; re-pushing the manifest it already points at succeeds.
+func (db *DB) PutManifest(ctx context.Context, repo string, m Manifest, refs []Ref, tag string, immutable bool) error {
 	return db.Tx(ctx, func(tx *sql.Tx) error {
 		repoID, err := EnsureRepo(ctx, tx, repo)
 		if err != nil {
@@ -229,6 +231,17 @@ func (db *DB) PutManifest(ctx context.Context, repo string, m Manifest, refs []R
 		}
 		if tag == "" {
 			return nil
+		}
+		if immutable {
+			var current int64
+			err := tx.QueryRowContext(ctx,
+				`SELECT manifest_id FROM tags WHERE repo_id = ? AND name = ?`, repoID, tag).Scan(&current)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			if err == nil && current != id {
+				return ErrTagImmutable
+			}
 		}
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO tags(repo_id, name, manifest_id, updated_at) VALUES(?, ?, ?, ?)

@@ -108,6 +108,16 @@
 		}
 	}
 
+	async function setImmutableTags(on: boolean) {
+		try {
+			await api.patch(`/api/projects/${q(name)}`, { immutableTags: on });
+			notify(on ? 'Existing tags can no longer be overwritten.' : 'Tags can be overwritten again.');
+			await load();
+		} catch (e) {
+			fail(e);
+		}
+	}
+
 	async function saveQuota(e: SubmitEvent) {
 		e.preventDefault();
 		savingQuota = true;
@@ -142,6 +152,7 @@
 	{#snippet meta()}
 		{#if p}
 			{#if p.public}<Badge tone="accent">Public</Badge>{:else}<Badge>Private</Badge>{/if}
+			{#if p.immutableTags || p.immutableTagsGlobal}<Badge>Immutable tags</Badge>{/if}
 		{/if}
 	{/snippet}
 </PageHeader>
@@ -199,6 +210,23 @@
 						description="Anyone can pull every repository in this project without an account."
 						checked={p.public}
 						onchange={(e) => setPublic(e.currentTarget.checked)}
+					/>
+				</div>
+			</Section>
+
+			<Section
+				title="Tags"
+				description={p.immutableTagsGlobal
+					? 'Tags are immutable in every project (set by the server configuration).'
+					: undefined}
+			>
+				<div class="card">
+					<Checkbox
+						label="Immutable tags"
+						description="Pushing a different image to an existing tag is rejected. New tags and re-pushing the same image still work; deleting a tag needs delete permission."
+						checked={p.immutableTags || p.immutableTagsGlobal}
+						disabled={p.immutableTagsGlobal}
+						onchange={(e) => setImmutableTags(e.currentTarget.checked)}
 					/>
 				</div>
 			</Section>

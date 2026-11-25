@@ -274,6 +274,20 @@ func TestAPIProjectMembers(t *testing.T) {
 	}
 
 	bob.expect(http.StatusOK, http.MethodPatch, "/api/projects/team", map[string]any{"public": true})
+
+	// Project admins lock tags; read members cannot.
+	carol.expect(http.StatusForbidden, http.MethodPatch, "/api/projects/team", map[string]any{"immutableTags": true})
+	bob.expect(http.StatusOK, http.MethodPatch, "/api/projects/team", map[string]any{"immutableTags": true})
+	var locked struct {
+		Project struct {
+			ImmutableTags bool  `json:"immutableTags"`
+			QuotaBytes    int64 `json:"quotaBytes"`
+		} `json:"project"`
+	}
+	apitDecode(t, e.admin.expect(http.StatusOK, http.MethodGet, "/api/projects/team", nil), &locked)
+	if !locked.Project.ImmutableTags || locked.Project.QuotaBytes != 1000 {
+		t.Errorf("after immutableTags PATCH: %+v, want immutable with quota 1000", locked.Project)
+	}
 	carol.expect(http.StatusForbidden, http.MethodPatch, "/api/projects/team", map[string]any{"public": false})
 
 	// Read-only members get the project but not the member list.

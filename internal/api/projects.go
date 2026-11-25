@@ -14,6 +14,9 @@ type projectItem struct {
 	Role         string `json:"role"` // the current user's effective role
 	Repositories int    `json:"repositories"`
 	UsedBytes    int64  `json:"usedBytes"`
+	// ImmutableTagsGlobal is set when DOREG_IMMUTABLE_TAGS makes tags
+	// immutable in every project, whatever the project setting says.
+	ImmutableTagsGlobal bool `json:"immutableTagsGlobal"`
 }
 
 func (a *API) projectItem(r *http.Request, p meta.Project) (projectItem, error) {
@@ -22,7 +25,7 @@ func (a *API) projectItem(r *http.Request, p meta.Project) (projectItem, error) 
 	if err != nil {
 		return projectItem{}, err
 	}
-	it := projectItem{Project: p, Role: role}
+	it := projectItem{Project: p, Role: role, ImmutableTagsGlobal: a.Registry != nil && a.Registry.ImmutableTags}
 	if it.Repositories, err = a.DB.ProjectRepoCount(r.Context(), p.Name); err != nil {
 		return it, err
 	}
@@ -54,9 +57,10 @@ func (a *API) projects(w http.ResponseWriter, r *http.Request) {
 }
 
 type projectBody struct {
-	Name       string `json:"name"`
-	Public     *bool  `json:"public"`
-	QuotaBytes *int64 `json:"quotaBytes"`
+	Name          string `json:"name"`
+	Public        *bool  `json:"public"`
+	QuotaBytes    *int64 `json:"quotaBytes"`
+	ImmutableTags *bool  `json:"immutableTags"`
 }
 
 func (a *API) createProject(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +78,9 @@ func (a *API) createProject(w http.ResponseWriter, r *http.Request) {
 	}
 	if b.QuotaBytes != nil && *b.QuotaBytes > 0 {
 		p.QuotaBytes = *b.QuotaBytes
+	}
+	if b.ImmutableTags != nil {
+		p.ImmutableTags = *b.ImmutableTags
 	}
 	p, err := a.DB.CreateProject(r.Context(), p)
 	if errors.Is(err, meta.ErrExists) {
@@ -141,11 +148,14 @@ func (a *API) updateProject(w http.ResponseWriter, r *http.Request) {
 		}
 		p.QuotaBytes = max(0, *b.QuotaBytes)
 	}
+	if b.ImmutableTags != nil {
+		p.ImmutableTags = *b.ImmutableTags
+	}
 	if err := a.DB.UpdateProject(r.Context(), p); err != nil {
 		a.fail(w, r, err)
 		return
 	}
-	a.record(r, "project_update", p.Name, p.Name, fmt.Sprintf("public=%t quota=%d", p.Public, p.QuotaBytes))
+	a.record(r, "project_update", p.Name, p.Name, fmt.Sprintf("public=%t quota=%d immutable_tags=%t", p.Public, p.QuotaBytes, p.ImmutableTags))
 	writeJSON(w, http.StatusOK, p)
 }
 

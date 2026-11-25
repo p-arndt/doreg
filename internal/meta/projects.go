@@ -60,12 +60,15 @@ type Project struct {
 	Name       string `json:"name"`
 	Public     bool   `json:"public"`
 	QuotaBytes int64  `json:"quotaBytes"`
-	CreatedAt  int64  `json:"createdAt"`
+	// ImmutableTags refuses pushes that move an existing tag to another
+	// manifest. DOREG_IMMUTABLE_TAGS turns this on for every project.
+	ImmutableTags bool  `json:"immutableTags"`
+	CreatedAt     int64 `json:"createdAt"`
 }
 
 func scanProject(s scanner) (Project, error) {
 	var p Project
-	err := s.Scan(&p.ID, &p.Name, &p.Public, &p.QuotaBytes, &p.CreatedAt)
+	err := s.Scan(&p.ID, &p.Name, &p.Public, &p.QuotaBytes, &p.ImmutableTags, &p.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNotFound
 	}
@@ -75,12 +78,12 @@ func scanProject(s scanner) (Project, error) {
 // ProjectByName looks a project up.
 func (db *DB) ProjectByName(ctx context.Context, name string) (Project, error) {
 	return scanProject(db.R.QueryRowContext(ctx,
-		`SELECT id, name, public, quota_bytes, created_at FROM projects WHERE name = ?`, name))
+		`SELECT id, name, public, quota_bytes, immutable_tags, created_at FROM projects WHERE name = ?`, name))
 }
 
 // Projects lists all projects.
 func (db *DB) Projects(ctx context.Context) ([]Project, error) {
-	rows, err := db.R.QueryContext(ctx, `SELECT id, name, public, quota_bytes, created_at FROM projects ORDER BY name`)
+	rows, err := db.R.QueryContext(ctx, `SELECT id, name, public, quota_bytes, immutable_tags, created_at FROM projects ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -103,8 +106,8 @@ var ErrExists = errors.New("already exists")
 func (db *DB) CreateProject(ctx context.Context, p Project) (Project, error) {
 	p.CreatedAt = Now()
 	err := db.W.QueryRowContext(ctx,
-		`INSERT INTO projects(name, public, quota_bytes, created_at) VALUES(?, ?, ?, ?) ON CONFLICT(name) DO NOTHING RETURNING id`,
-		p.Name, p.Public, p.QuotaBytes, p.CreatedAt).Scan(&p.ID)
+		`INSERT INTO projects(name, public, quota_bytes, immutable_tags, created_at) VALUES(?, ?, ?, ?, ?) ON CONFLICT(name) DO NOTHING RETURNING id`,
+		p.Name, p.Public, p.QuotaBytes, p.ImmutableTags, p.CreatedAt).Scan(&p.ID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrExists
 	}
@@ -122,10 +125,10 @@ func (db *DB) EnsureProject(ctx context.Context, name string) (Project, error) {
 	return db.ProjectByName(ctx, name)
 }
 
-// UpdateProject changes visibility and quota.
+// UpdateProject changes visibility, quota and tag immutability.
 func (db *DB) UpdateProject(ctx context.Context, p Project) error {
-	res, err := db.W.ExecContext(ctx, `UPDATE projects SET public = ?, quota_bytes = ? WHERE id = ?`,
-		p.Public, p.QuotaBytes, p.ID)
+	res, err := db.W.ExecContext(ctx, `UPDATE projects SET public = ?, quota_bytes = ?, immutable_tags = ? WHERE id = ?`,
+		p.Public, p.QuotaBytes, p.ImmutableTags, p.ID)
 	if err != nil {
 		return err
 	}

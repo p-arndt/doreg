@@ -231,6 +231,10 @@ export interface Project {
 	public: boolean;
 	/** 0 means no quota. */
 	quotaBytes: number;
+	/** Pushes may not move an existing tag to another manifest. */
+	immutableTags: boolean;
+	/** DOREG_IMMUTABLE_TAGS locks tags in every project, overriding immutableTags. */
+	immutableTagsGlobal: boolean;
 	createdAt: number;
 	/** The caller's effective role. */
 	role: ProjectRole;
