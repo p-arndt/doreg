@@ -22,6 +22,9 @@ var migrationFS embed.FS
 // ErrNotFound is returned when a row does not exist.
 var ErrNotFound = errors.New("not found")
 
+// ErrTagImmutable is returned when a push would move an immutable tag.
+var ErrTagImmutable = errors.New("tag is immutable")
+
 // DB wraps one writer connection and a pool of readers. SQLite allows a single
 // writer; funnelling writes through one connection with BEGIN IMMEDIATE avoids
 // SQLITE_BUSY upgrade deadlocks, and readers never block on WAL.

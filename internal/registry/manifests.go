@@ -145,7 +145,12 @@ func (h *Handler) putManifest(w http.ResponseWriter, r *http.Request, name, ref 
 	if !isDigest {
 		tag = ref
 	}
-	if err := h.DB.PutManifest(r.Context(), name, rec, refs, tag); err != nil {
+	if err := h.DB.PutManifest(r.Context(), name, rec, refs, tag, tag != "" && h.tagImmutable(r, name, tag)); err != nil {
+		if errors.Is(err, meta.ErrTagImmutable) {
+			writeError(w, http.StatusForbidden, "DENIED",
+				"tag "+tag+" exists and is immutable in project "+meta.ProjectOf(name)+"; push a new tag instead")
+			return
+		}
 		var missing *meta.ErrMissingRef
 		if errors.As(err, &missing) {
 			code := "MANIFEST_BLOB_UNKNOWN"
@@ -166,6 +171,17 @@ func (h *Handler) putManifest(w http.ResponseWriter, r *http.Request, name, ref 
 	w.Header().Set("Docker-Content-Digest", d.String())
 	w.Header().Set("Content-Length", "0")
 	w.WriteHeader(http.StatusCreated)
+}
+
+// tagImmutable reports whether the tag, once it exists, may not be moved to
+// another manifest. The server-wide setting and the project setting each
+// lock it unless the tag matches one of their own exception patterns.
+func (h *Handler) tagImmutable(r *http.Request, repo, tag string) bool {
+	if h.ImmutableTags && !meta.TagMatches(h.MutableTags, tag) {
+		return true
+	}
+	p, err := h.DB.ProjectByName(r.Context(), meta.ProjectOf(repo))
+	return err == nil && p.ImmutableTags && !meta.TagMatches(p.MutableTags, tag)
 }
 
 func (h *Handler) referrers(w http.ResponseWriter, r *http.Request, name, ref string) {

@@ -34,6 +34,10 @@ type Handler struct {
 	Auth   *auth.Authenticator
 	Events *events.Bus // optional
 	Log    *slog.Logger
+	// ImmutableTags makes tags immutable in every project, regardless of the
+	// project setting, except tags matching one of the MutableTags globs.
+	ImmutableTags bool
+	MutableTags   []string
 }
 
 // emit sends an event if a bus is configured, filling actor and host.

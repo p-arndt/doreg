@@ -34,6 +34,8 @@
 	let error = $state<unknown>(null);
 	let reposError = $state<unknown>(null);
 	let quotaGb = $state('');
+	let mutableTags = $state('');
+	let savingMutable = $state(false);
 	let savingQuota = $state(false);
 	let confirmName = $state('');
 	let deleting = $state(false);
@@ -45,6 +47,7 @@
 		try {
 			detail = await api.get<ProjectDetail>(`/api/projects/${q(name)}`);
 			quotaGb = detail.project.quotaBytes ? String(detail.project.quotaBytes / 1e9) : '';
+			mutableTags = detail.project.mutableTags.join(', ');
 		} catch (e) {
 			error = e;
 		}
@@ -108,6 +111,32 @@
 		}
 	}
 
+	async function setImmutableTags(on: boolean) {
+		try {
+			await api.patch(`/api/projects/${q(name)}`, { immutableTags: on });
+			notify(on ? 'Existing tags can no longer be overwritten.' : 'Tags can be overwritten again.');
+			await load();
+		} catch (e) {
+			fail(e);
+		}
+	}
+
+	async function saveMutableTags(e: SubmitEvent) {
+		e.preventDefault();
+		savingMutable = true;
+		try {
+			await api.patch(`/api/projects/${q(name)}`, {
+				mutableTags: mutableTags.split(',').map((t) => t.trim())
+			});
+			notify('Exceptions saved.');
+			await load();
+		} catch (err) {
+			fail(err);
+		} finally {
+			savingMutable = false;
+		}
+	}
+
 	async function saveQuota(e: SubmitEvent) {
 		e.preventDefault();
 		savingQuota = true;
@@ -142,6 +171,7 @@
 	{#snippet meta()}
 		{#if p}
 			{#if p.public}<Badge tone="accent">Public</Badge>{:else}<Badge>Private</Badge>{/if}
+			{#if p.immutableTags || p.immutableTagsGlobal}<Badge>Immutable tags</Badge>{/if}
 		{/if}
 	{/snippet}
 </PageHeader>
@@ -200,6 +230,33 @@
 						checked={p.public}
 						onchange={(e) => setPublic(e.currentTarget.checked)}
 					/>
+				</div>
+			</Section>
+
+			<Section
+				title="Tags"
+				description={p.immutableTagsGlobal
+					? `The server makes tags immutable in every project${p.mutableTagsGlobal.length ? ` except ${p.mutableTagsGlobal.join(', ')}` : ''}; exceptions here do not lift that.`
+					: undefined}
+			>
+				<div class="card tags">
+					<Checkbox
+						label="Immutable tags"
+						description="Pushing a different image to an existing tag is rejected. New tags and re-pushing the same image still work; deleting a tag needs delete permission."
+						checked={p.immutableTags}
+						onchange={(e) => setImmutableTags(e.currentTarget.checked)}
+					/>
+					{#if p.immutableTags}
+						<form class="quota" onsubmit={saveMutableTags}>
+							<Field
+								label="Exceptions"
+								hint="Comma-separated tags that stay overwritable; * and ? are wildcards, e.g. latest, *-dev."
+							>
+								<Input bind:value={mutableTags} placeholder="latest, *-dev" />
+							</Field>
+							<Button type="submit" loading={savingMutable}>Save exceptions</Button>
+						</form>
+					{/if}
 				</div>
 			</Section>
 
@@ -287,6 +344,13 @@
 
 	.quota :global(.field) {
 		flex: 0 1 14rem;
+	}
+	.tags {
+		display: grid;
+		gap: var(--space-4);
+	}
+	.tags .quota :global(.field) {
+		flex: 1 1 18rem;
 	}
 
 	.card--danger {

@@ -16,7 +16,7 @@ func TestPullCountsSurviveClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := meta.Manifest{Digest: "sha256:aa", MediaType: "application/vnd.oci.image.manifest.v1+json", Content: []byte("{}")}
-	if err := db.PutManifest(ctx, "app", m, nil, "v1"); err != nil {
+	if err := db.PutManifest(ctx, "app", m, nil, "v1", false); err != nil {
 		t.Fatal(err)
 	}
 	got, err := db.GetManifest(ctx, "app", "v1", false)
