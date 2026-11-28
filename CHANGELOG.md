@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## 0.5.0 - 2026-11-28
+
+### Added
+
+- Immutable tags: per project (project settings) or for every project (DOREG_IMMUTABLE_TAGS=true), pushes that would point an existing tag at a different manifest are rejected; exception patterns such as latest or *-dev keep single tags overwritable (DOREG_MUTABLE_TAGS server-wide)
+
 ## 0.4.0 - 2026-11-17
 
 ### Added
